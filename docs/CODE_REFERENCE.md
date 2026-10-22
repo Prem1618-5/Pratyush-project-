@@ -24,7 +24,7 @@ One command runs everything: `bash scripts/run_all.sh` (download → parse → e
 | `python -m soh.data.download [--nasa-only]` | `data/raw/*.mat` (MIT ≈ 8.3 GB, NASA ≈ 210 MB; resumable, size-checked) |
 | `python -m soh.data.mit_loader` | `data/processed/mit_cycles_raw.parquet` (committed: 100,501 rows, 124 cells) |
 | `python -m soh.data.nasa_loader` | `data/processed/nasa_cycles.parquet` (committed) |
-| `python -m soh.experiments [--quick] [--skip-deep]` | `reports/results/*.json/csv`, `reports/figures/*.png`, `models/*.joblib` |
+| `python -m soh.experiments [--quick] [--skip-deep]` (18 min measured, 4 cores) | `reports/results/*.json/csv`, `reports/figures/*.png`, `models/*.joblib` |
 | `python -m soh.report` | `reports/RESULTS.md` |
 | `python -m soh.predict --demo` | per-cycle SOH estimates + status, `soh_estimates.csv` |
 | `pytest -q` | 9 unit tests on synthetic data (no download needed) |

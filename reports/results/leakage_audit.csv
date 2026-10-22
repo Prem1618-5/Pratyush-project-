@@ -1,0 +1,42 @@
+feature,family,prior,spearman_pooled,spearman_within,r2_single_cv,coverage,status,meaning
+IR,F1 resistance,safe,-0.548149420067612,-0.8539202214476274,0.5337470890572669,1.0,safe,Internal resistance rises as electrodes/electrolyte age
+Tavg,F2 temperature,safe,-0.17898517907047087,-0.677902973107876,-0.049304408592345306,1.0,safe,Aged cells self-heat more for the same current
+Tmin,F2 temperature,safe,-0.023201866550159773,-0.1674671302972042,-0.007430416384205829,1.0,safe,Cycle minimum can temperature
+Tmax,F2 temperature,safe,-0.24554829434279155,-0.7543703322283327,-0.03280313219615305,1.0,safe,Cycle maximum can temperature
+Trange,F2 temperature,safe,-0.2788593411582062,-0.8722458182383677,-0.028679783948558413,1.0,safe,Tmax - Tmin: heating swing within a cycle
+d_IR,F3 change vs new,safe,-0.6644452593358982,-0.8539202214476274,0.7790781181347841,1.0,safe,IR minus the cell's own early-life baseline
+d_Tavg,F3 change vs new,safe,-0.3565356981235631,-0.677902973107876,0.15278659281706108,1.0,safe,Tavg minus early-life baseline
+chg_v_start,F4 1C charge segment,caution,-0.70554418808295,-0.9961247141283915,0.8168522136089083,1.0,caution,Lowest voltage in the 1C phase (after relaxation): overpotential + true SOC
+chg_t_cv,F4 1C charge segment,caution,-0.1173585148532785,-0.3580504548404586,0.4715373657161427,1.0,caution,Duration of the 3.6 V constant-voltage taper (kinetics)
+chg_q_cv,F4 1C charge segment,caution,-0.026584294687981076,-0.36182441485212713,0.43100259894237924,1.0,caution,Charge accepted during the CV taper
+chg_cv_tau,F4 1C charge segment,caution,-0.1718288240779866,-0.366198439188627,0.5449493802318347,1.0,caution,Time for CV current to halve from 1C (diffusion/resistance)
+chg_dT,F4 1C charge segment,caution,-0.2268039726366655,0.019033913614042892,-0.08623660701456015,1.0,caution,Temperature change over the 1C+CV segment
+d_chg_v_start,F3 change vs new,caution,-0.8911407326449393,-0.9961247141283915,0.8896945203965698,1.0,caution,chg_v_start minus baseline
+d_chg_t_cv,F3 change vs new,caution,-0.03601406748247699,-0.3580504548404586,0.49849278479065884,1.0,caution,chg_t_cv minus baseline
+d_chg_cv_tau,F3 change vs new,caution,-0.1539598927510177,-0.366198439188627,0.5011503858053352,1.0,caution,chg_cv_tau minus baseline
+chg_ic_peak,F5 charge IC,caution,0.9216528288996155,0.9977180247003132,0.8974075092778365,1.0,caution,Height of dQ/dV peak on the 1C segment (graphite staging)
+chg_ic_peak_v,F5 charge IC,caution,-0.8491619913762816,-0.9575957843370497,0.7337813259034932,1.0,caution,Voltage of that peak; shifts with LLI/LAM
+d_chg_ic_peak,F3 change vs new,caution,0.8876261320385547,0.9977180247003132,0.7420835633658236,1.0,caution,chg_ic_peak minus baseline
+dq_var_log,F6 partial dQ(V),caution,-0.8592203053392352,-0.9845951168349849,0.8348706030154663,1.0,caution,"log10 var of Q_k(V)-Q_10(V), 3.3-2.9 V (Severson's key feature)"
+dq_min_log,F6 partial dQ(V),caution,-0.8695706208448406,-0.9889872257167099,0.8481272860733191,1.0,caution,log10 |min| of the same curve difference
+dq_mean,F6 partial dQ(V),caution,0.8405135263596573,0.972882896139666,0.8232847349255057,1.0,caution,Mean of the curve difference in the partial window
+chargetime,F7 protocol,ablation,-0.5238416347460912,-0.8279301244574212,0.07109000619354378,1.0,ablation,Total charge time: mostly encodes which of 72 policies was used
+cycle,F9 age,ablation,-0.7374165544683902,-0.9980876691588207,0.28825404846908287,1.0,ablation,"Cycle count: shortcut, lifetimes span 150-2,300 cycles"
+QD,X1 label,excluded,1.0,1.0,0.9998819309956363,1.0,EXCLUDED (physics/definition),IS the label
+QC,X2 charge capacity,excluded,0.9996100092200781,0.999764397415227,0.9986414134492111,1.0,EXCLUDED (physics/definition),Coulombic efficiency ~1 so QC ~ QD
+dis_time,X3 discharge time,excluded,0.9542627382198712,0.9975793805807355,0.9432181026044572,1.0,EXCLUDED (physics/definition),Q = I*t with I fixed at 4.4 A
+dis_energy,X4 discharge energy,excluded,0.943053934880189,0.9952275345143698,0.9320573898007135,1.0,EXCLUDED (physics/definition),Capacity x nearly constant LFP voltage
+chg_t_cc,X* 1C CC duration,excluded,0.9813770000838793,0.9957024910384495,0.9470769893807203,1.0,EXCLUDED (physics/definition),"Charge starts from empty, fast phase stops at 0.88 Ah, so 1C time ~ (QC-0.88)/1.1 A"
+chg_q_cc,X* 1C CC charge,excluded,0.981726180057446,0.9958732503855763,0.9489714394598939,1.0,EXCLUDED (physics/definition),= QC - 0.88 Ah - CV charge: capacity in disguise
+IR_rm5,F8 history,safe,-0.5459716602612077,-0.8708683988796192,0.5227865412888729,1.0,safe,5-cycle causal rolling mean of IR
+Tavg_rm5,F8 history,safe,-0.18055540824998878,-0.7045033214747375,-0.0607681688574877,1.0,safe,5-cycle causal rolling mean of Tavg
+Tmax_rm5,F8 history,safe,-0.24701687576246992,-0.7768185104717492,-0.07525560741586035,1.0,safe,5-cycle causal rolling mean of Tmax
+chg_v_start_rm5,F8 history,caution,-0.6961500712095626,-0.9967409299073132,0.8086238678676978,1.0,caution,5-cycle causal rolling mean of chg_v_start
+chg_t_cv_rm5,F8 history,caution,-0.12026689862480466,-0.36383196552853336,0.44061072242477983,1.0,caution,5-cycle causal rolling mean of chg_t_cv
+chg_cv_tau_rm5,F8 history,caution,-0.1791359512835548,-0.3915567450613234,0.5637304159575475,1.0,caution,5-cycle causal rolling mean of chg_cv_tau
+chg_ic_peak_rm5,F8 history,caution,0.9223582148611543,0.9981693336018707,0.8996488774241248,1.0,caution,5-cycle causal rolling mean of chg_ic_peak
+chg_ic_peak_v_rm5,F8 history,caution,-0.8536106602642712,-0.9628812377938287,0.7246785458560807,1.0,caution,5-cycle causal rolling mean of chg_ic_peak_v
+chg_dT_rm5,F8 history,caution,-0.23674843106500312,0.10479542706610119,-0.17592534324241127,1.0,caution,5-cycle causal rolling mean of chg_dT
+dq_var_log_rm5,F8 history,caution,-0.8603103991673553,-0.9845999291496061,0.8311237003060121,1.0,caution,5-cycle causal rolling mean of dq_var_log
+dq_min_log_rm5,F8 history,caution,-0.870823380815228,-0.9890042887012428,0.8461556262685704,1.0,caution,5-cycle causal rolling mean of dq_min_log
+dq_mean_rm5,F8 history,caution,0.8407441894608704,0.973372609669612,0.8248824470423567,1.0,caution,5-cycle causal rolling mean of dq_mean

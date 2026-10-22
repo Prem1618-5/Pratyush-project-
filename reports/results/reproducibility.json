@@ -1,0 +1,15 @@
+{
+  "python": "3.13.16",
+  "numpy": "2.5.3",
+  "pandas": "3.0.5",
+  "scikit-learn": "1.9.1",
+  "xgboost": "3.4.1",
+  "torch": "2.14.1+cpu",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "commit": "6fa4d1c",
+  "date": "2026-10-22 19:10"
+}

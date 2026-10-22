@@ -37,7 +37,7 @@ CATALOGUE = {
     "dq_min_log":    ("F6 partial dQ(V)", "caution", "log10 |min| of the same curve difference"),
     "dq_mean":       ("F6 partial dQ(V)", "caution", "Mean of the curve difference in the partial window"),
     "chargetime":    ("F7 protocol", "ablation", "Total charge time: mostly encodes which of 72 policies was used"),
-    "cycle":         ("F9 age", "ablation", "Cycle count: shortcut, lifetimes span 150-2,300 cycles"),
+    "cycle":         ("F9 age", "ablation", "Cycle count: shortcut, lifetimes span 170-2,240 cycles"),
     # ---- label-equivalent: excluded by definition (kept only to show the audit catches them)
     "QD":            ("X1 label", "excluded", "IS the label"),
     "QC":            ("X2 charge capacity", "excluded", "Coulombic efficiency ~1 so QC ~ QD"),
