@@ -81,16 +81,19 @@ def build():
         model, fset = key.split(" | ")
         rows.append([model, fset, ms(p["RMSE"]), ms(p["MAE"]), ms(p["MAPE"]), ms(p["R2"], 3),
                      ms(s["RMSE"]), ms(s["MAE"]), ms(p["RMSE_80-85"]), ms(s["RMSE_80-85"]),
-                     ms(p["EOL_abs_err_mean"], 0), ms(s["EOL_abs_err_mean"], 0),
+                     ms(p["EOL_abs_err_mean"], 0), f"{p['EOL_undefined_cells']['mean']:.0f} / 43",
+                     f"{s['EOL_undefined_cells']['mean']:.0f} / 40",
                      ms(p["cell_RMSE_worst"]), ms(s["cell_RMSE_worst"])])
     L += ["## 3. Main results — template R1 (O3)", "",
           md_table(["Model", "Features", "Primary RMSE", "Primary MAE", "Primary MAPE %", "Primary R²",
                     "Secondary RMSE", "Secondary MAE", "EOL-band (80–85 %) RMSE prim.",
-                    "EOL-band RMSE sec.", "Mean \\|EOL error\\| prim. (cycles)",
-                    "Mean \\|EOL error\\| sec. (cycles)", "Worst-cell RMSE prim.", "Worst-cell RMSE sec."], rows),
+                    "EOL-band RMSE sec.", "Mean \\|EOL error\\| prim. (cycles, alarmed cells)",
+                    "Missed EOL alarms prim.", "Missed EOL alarms sec.", "Worst-cell RMSE prim.", "Worst-cell RMSE sec."], rows),
           "", f"EOL error uses an alarm at {config.EOL_ALARM_SOH} % SOH (batch-3 cells stop at "
           "80.0–80.15 %, so a strict 80 % crossing never occurs there). It is computed on raw, "
-          "unsmoothed per-cycle estimates, so a single noisy low estimate triggers an early alarm.", "",
+          "unsmoothed per-cycle estimates, so a single noisy low estimate triggers an early alarm. "
+          "A **missed alarm** = the cell truly crossed the alarm level but the estimate never did "
+          "(the model is optimistic near end of life) — the dangerous failure mode for a BMS.", "",
           "![pred vs true](figures/03_pred_vs_true.png)", "",
           "![trajectories primary](figures/04_trajectories_test_primary.png)", "",
           "![trajectories secondary](figures/04_trajectories_test_secondary.png)", "",
