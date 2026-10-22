@@ -94,6 +94,8 @@ def build():
           "unsmoothed per-cycle estimates, so a single noisy low estimate triggers an early alarm. "
           "A **missed alarm** = the cell truly crossed the alarm level but the estimate never did "
           "(the model is optimistic near end of life) — the dangerous failure mode for a BMS.", "",
+          f"Figures below use the model with the lowest mean of primary and secondary RMSE: "
+          f"**{(_load('best_model.json') or {}).get('best_model', '')}**.", "",
           "![pred vs true](figures/03_pred_vs_true.png)", "",
           "![trajectories primary](figures/04_trajectories_test_primary.png)", "",
           "![trajectories secondary](figures/04_trajectories_test_secondary.png)", "",

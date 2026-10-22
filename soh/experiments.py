@@ -338,7 +338,10 @@ def main(quick=False, skip_deep=False):
 
     tab, store, tuned = run_tabular(df, fsets, train_rows, seeds)
     xgb_params = tuned[f"xgb|{features.MAIN_SET}"]["params"]
-    best_key = min(tab, key=lambda k: tab[k]["test_primary"]["RMSE"]["mean"])
+    # "best" = lowest mean of primary and secondary RMSE: a model that is excellent on familiar
+    # cells but fails on a new batch (Ridge here) should not be the one we showcase
+    best_key = min(tab, key=lambda k: tab[k]["test_primary"]["RMSE"]["mean"] + tab[k]["test_secondary"]["RMSE"]["mean"])
+    _save_json({"best_model": best_key}, "best_model.json")
     preds, _, _, _ = store[best_key]
     plots.pred_vs_true(preds, best_key)
     for split in ("test_primary", "test_secondary"):
