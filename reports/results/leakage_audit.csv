@@ -17,9 +17,9 @@ d_chg_cv_tau,F3 change vs new,caution,-0.1539598927510177,-0.366198439188627,0.5
 chg_ic_peak,F5 charge IC,caution,0.9216528288996155,0.9977180247003132,0.8974075092778365,1.0,caution,Height of dQ/dV peak on the 1C segment (graphite staging)
 chg_ic_peak_v,F5 charge IC,caution,-0.8491619913762816,-0.9575957843370497,0.7337813259034932,1.0,caution,Voltage of that peak; shifts with LLI/LAM
 d_chg_ic_peak,F3 change vs new,caution,0.8876261320385547,0.9977180247003132,0.7420835633658236,1.0,caution,chg_ic_peak minus baseline
-dq_var_log,F6 partial dQ(V),caution,-0.8592203053392352,-0.9845951168349849,0.8348706030154663,1.0,caution,"log10 var of Q_k(V)-Q_10(V), 3.3-2.9 V (Severson's key feature)"
-dq_min_log,F6 partial dQ(V),caution,-0.8695706208448406,-0.9889872257167099,0.8481272860733191,1.0,caution,log10 |min| of the same curve difference
-dq_mean,F6 partial dQ(V),caution,0.8405135263596573,0.972882896139666,0.8232847349255057,1.0,caution,Mean of the curve difference in the partial window
+dq_var_log,F6 partial dQ(V),caution,-0.8594239128406151,-0.9855603284070183,0.8339414411862285,0.9883290634785084,caution,"log10 var of Q_k(V)-Q_10(V), 3.3-2.9 V (Severson's key feature)"
+dq_min_log,F6 partial dQ(V),caution,-0.8699904937869642,-0.9903242816612329,0.8472931880879281,0.9883290634785084,caution,log10 |min| of the same curve difference
+dq_mean,F6 partial dQ(V),caution,0.8405419970394259,0.9838061444988722,0.8222714785696426,0.9883290634785084,caution,Mean of the curve difference in the partial window
 chargetime,F7 protocol,ablation,-0.5238416347460912,-0.8279301244574212,0.07109000619354378,1.0,ablation,Total charge time: mostly encodes which of 72 policies was used
 cycle,F9 age,ablation,-0.7374165544683902,-0.9980876691588207,0.28825404846908287,1.0,ablation,"Cycle count: shortcut, lifetimes span 170-2,240 cycles"
 QD,X1 label,excluded,1.0,1.0,0.9998819309956363,1.0,EXCLUDED (physics/definition),IS the label
@@ -37,6 +37,6 @@ chg_cv_tau_rm5,F8 history,caution,-0.1791359512835548,-0.3915567450613234,0.5637
 chg_ic_peak_rm5,F8 history,caution,0.9223582148611543,0.9981693336018707,0.8996488774241248,1.0,caution,5-cycle causal rolling mean of chg_ic_peak
 chg_ic_peak_v_rm5,F8 history,caution,-0.8536106602642712,-0.9628812377938287,0.7246785458560807,1.0,caution,5-cycle causal rolling mean of chg_ic_peak_v
 chg_dT_rm5,F8 history,caution,-0.23674843106500312,0.10479542706610119,-0.17592534324241127,1.0,caution,5-cycle causal rolling mean of chg_dT
-dq_var_log_rm5,F8 history,caution,-0.8603103991673553,-0.9845999291496061,0.8311237003060121,1.0,caution,5-cycle causal rolling mean of dq_var_log
-dq_min_log_rm5,F8 history,caution,-0.870823380815228,-0.9890042887012428,0.8461556262685704,1.0,caution,5-cycle causal rolling mean of dq_min_log
-dq_mean_rm5,F8 history,caution,0.8407441894608704,0.973372609669612,0.8248824470423567,1.0,caution,5-cycle causal rolling mean of dq_mean
+dq_var_log_rm5,F8 history,caution,-0.8604814987547527,-0.9863434339115802,0.830091029386453,0.9883290634785084,caution,5-cycle causal rolling mean of dq_var_log
+dq_min_log_rm5,F8 history,caution,-0.8712541780589568,-0.9910563631966549,0.8453356186100455,0.9883290634785084,caution,5-cycle causal rolling mean of dq_min_log
+dq_mean_rm5,F8 history,caution,0.8407443280661827,0.9837661531779135,0.8239070774303636,0.9883290634785084,caution,5-cycle causal rolling mean of dq_mean

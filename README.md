@@ -17,16 +17,16 @@ reference capacity** on cells the model has never seen.
 |---|---|---|---|
 | Dummy (predict training mean) | — | 5.14 | 4.01 |
 | XGBoost | cycle count only | 4.06 | 3.53 |
-| Ridge | A4 (all audited) | 1.14 | 5.88 |
-| Random Forest | A4 | 1.20 ± 0.01 | 2.46 ± 0.07 |
-| XGBoost | A4 | 1.22 ± 0.01 | 3.00 ± 0.15 |
-| **XGBoost (BMS-feasible model)** | **A2: charge segment + IR + temperature** | **1.24 ± 0.00** | **1.88 ± 0.19** |
-| LSTM (k = 10 cycles) | A3 windows | 1.09 ± 0.03 | 4.05 ± 0.30 |
-| 1D-CNN (k = 10 cycles) | A3 windows | 0.97 ± 0.05 | 4.46 ± 0.66 |
+| Ridge | A4 (all audited) | 1.14 | 5.87 |
+| Random Forest | A4 | 1.20 ± 0.01 | 2.38 ± 0.04 |
+| XGBoost | A4 | 1.22 ± 0.02 | 2.97 ± 0.09 |
+| **XGBoost (BMS-feasible model)** | **A2: charge segment + IR + temperature** | **1.23 ± 0.01** | **2.21 ± 0.05** |
+| LSTM (k = 10 cycles) | A3 windows | 1.11 ± 0.01 | 4.04 ± 0.36 |
+| 1D-CNN (k = 10 cycles) | A3 windows | 0.96 ± 0.06 | 4.56 ± 0.78 |
 
 **Deployed model:** XGBoost on A2. It needs no laboratory discharge, it equals the best tree models on
 familiar cells and it is the most accurate on the later batch. Example on an unseen cell:
-`python -m soh.predict --demo` → 1.24 % SOH RMSE over 1,007 cycles.
+`python -m soh.predict --demo` → 1.63 % SOH RMSE over 1,007 cycles.
 
 ## How the problem statement is answered
 
@@ -76,25 +76,25 @@ models/                  deployable XGBoost models (main = A4, bms = A2) + train
 ## Key findings
 
 1. **The split matters more than the model.** Same 84 cells, same model: a random **row** split gives
-   0.15 % RMSE and a **cell-wise** split 0.56–0.65 %, i.e. ~4× optimistic. Random-row numbers are leakage, not skill.
+   0.21 % RMSE and a **cell-wise** split 0.60–0.67 %, i.e. ~3× optimistic. Random-row numbers are leakage, not skill.
 2. **Many signals are the label in disguise.** Every MIT cell is discharged identically, so discharge
    time and energy restate capacity. The same is true of the charge taken in the 1C phase (the fast phase
    always stops at 0.88 Ah, so the rest ≈ QC − 0.88). The empirical audit reproduces this: known
    disguised labels reach single-feature R² 0.93–0.95. The exclusion threshold is calibrated from them
    (R² ≥ 0.922), not guessed.
 3. **Counting cycles is not enough.** Cycle count alone gives 4.1 % RMSE, against 1.2 % for health features.
-   Lifetimes range from ~150 to 2,300 cycles.
+   Lifetimes range from ~170 to 2,240 cycles.
 4. **Batch shift is the real enemy.** Batch 3 (secondary test, cycled ~1 year later) rests only 5 s
    after fast charging, against minutes in batches 1–2. This shifts relaxation-sensitive charge features.
    Every model is worse there, and Ridge and the deep models collapse (4–6 % RMSE). Trees and the smaller
    BMS feature set degrade least. When some batch-3 cells are in training (10 random 80/20 cell splits),
-   error falls to 0.52 ± 0.10 %, the case for fleet recalibration.
+   error falls to 0.53 ± 0.09 %, the case for fleet recalibration.
 5. **Deep models win in-distribution but generalise worse.** 1D-CNN and LSTM beat the trees on the primary
-   set (0.97 and 1.09 %) but lose badly on the later batch. This refines, rather than contradicts, the
+   set (0.96 and 1.11 %) but lose badly on the later batch. This refines, rather than contradicts, the
    literature's "trees beat LSTMs".
 6. **Safety caveat: models are optimistic near end of life.** On the later batch no model's raw estimate
    crosses the 80.5 % alarm level before the cell does (missed alarms; RESULTS §3). A BMS must not use
-   these estimates alone for retirement decisions without a safety margin or periodic reference tests.
+   these estimates alone for retirement decisions (no model raised a false alarm) without a safety margin or periodic reference tests.
 7. **Cross-chemistry transfer fails, as expected.** NASA leave-one-battery-out gives 8–9 % RMSE with trees (Ridge 13.6 %). MIT → NASA
    zero-shot gives ~11–12 %, and the trees floor at ~85 % because MIT labels never go as low as NASA's (57 %).
 
@@ -106,7 +106,7 @@ models/                  deployable XGBoost models (main = A4, bms = A2) + train
 - **One caveat on A2.** Its top features (`chg_ic_peak`, `chg_v_start`) are measured a fixed charge
   (0.88 Ah) after a *full* discharge. In an EV the charge starts from an arbitrary SOC, so these must be
   re-expressed over a fixed **voltage window** (partial-charge incremental capacity) before field use.
-- **Compute is not the bottleneck.** XGBoost runs in ~2 ms per cycle in Python (≈3.5 MB with 1,000 trees;
+- **Compute is not the bottleneck.** XGBoost runs in ~3 ms per cycle in Python (≈1.6 MB with 1,000 depth-4 trees;
   shrinking the tree count would cut that). The 1D-CNN is 10.6k parameters. An unlimited-depth Random
   Forest is ~730 MB, impractical on an MCU.
 - **Monitoring logic.** `soh.predict` smooths the per-cycle estimate (5-cycle median) and maps it to

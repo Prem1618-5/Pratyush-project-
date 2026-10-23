@@ -1,3 +1,5 @@
 {
-  "best_model": "Random Forest | A4_plus_history"
+  "best_model": "XGBoost | A4_plus_history",
+  "selected_by": "inner-CV RMSE on training cells",
+  "cv_rmse": 0.77998493865832
 }

@@ -1,27 +1,27 @@
 {
   "footprint": {
     "XGBoost A4_plus_history": {
-      "params": "1000 trees x depth<=6",
-      "size_kb": 3548.1689453125,
-      "ms_per_cycle": 2.2528089000002183,
+      "params": "1000 trees x depth<=4",
+      "size_kb": 1630.6904296875,
+      "ms_per_cycle": 2.5653707466669102,
       "needs_full_discharge": "yes (dQ(V) features)"
     },
     "XGBoost A2_bms_charge": {
-      "params": "1000 trees x depth<=6",
-      "size_kb": 3507.037109375,
-      "ms_per_cycle": 1.6842037166664645,
+      "params": "1000 trees x depth<=4",
+      "size_kb": 1615.2021484375,
+      "ms_per_cycle": 2.793134263332983,
       "needs_full_discharge": "no (charge segment, IR, temperature)"
     },
     "Random Forest A4": {
       "params": "300 trees, mean depth 32",
-      "size_kb": 749089.056640625,
-      "ms_per_cycle": 73.38716536999982,
+      "size_kb": 749085.119140625,
+      "ms_per_cycle": 81.52973852000059,
       "needs_full_discharge": "yes (dQ(V) features)"
     },
     "Ridge A4": {
       "params": "34 coefficients",
       "size_kb": 3.1494140625,
-      "ms_per_cycle": 1.1702417300011803,
+      "ms_per_cycle": 1.2609628099994552,
       "needs_full_discharge": "yes (dQ(V) features)"
     }
   }

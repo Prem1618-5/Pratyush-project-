@@ -24,10 +24,10 @@ One command runs everything: `bash scripts/run_all.sh` (download → parse → e
 | `python -m soh.data.download [--nasa-only]` | `data/raw/*.mat` (MIT ≈ 8.3 GB, NASA ≈ 210 MB; resumable, size-checked) |
 | `python -m soh.data.mit_loader` | `data/processed/mit_cycles_raw.parquet` (committed: 100,501 rows, 124 cells) |
 | `python -m soh.data.nasa_loader` | `data/processed/nasa_cycles.parquet` (committed) |
-| `python -m soh.experiments [--quick] [--skip-deep]` (18 min measured, 4 cores) | `reports/results/*.json/csv`, `reports/figures/*.png`, `models/*.joblib` |
+| `python -m soh.experiments [--quick] [--skip-deep]` (17–18 min measured, 4 cores) | `reports/results/*.json/csv`, `reports/figures/*.png`, `models/*.joblib` |
 | `python -m soh.report` | `reports/RESULTS.md` |
 | `python -m soh.predict --demo` | per-cycle SOH estimates + status, `soh_estimates.csv` |
-| `pytest -q` | 15 unit tests on synthetic data (no download needed) |
+| `pytest -q` | 19 unit tests on synthetic data (no download needed) |
 
 ---
 
@@ -55,7 +55,7 @@ One command runs everything: `bash scripts/run_all.sh` (download → parse → e
 
 ### `download.py`
 - `_fetch(url, dest, expected_size)` — streams with HTTP `Range` so an interrupted download resumes; deletes and restarts a file that is larger than expected or that the server refuses to resume (HTTP 416); raises if the final size is wrong.
-- `download_mit()`, `download_nasa()` — NASA's zip contains inner zips; only the `FY08Q4` one (B0005/6/7/18) is extracted.
+- `download_mit()`, `download_nasa()` — NASA's zip contains inner zips; only the `FY08Q4` one (B0005/6/7/18) is extracted, and extraction re-runs until all four cells exist.
 
 ### `mit_loader.py`
 Reads MATLAB v7.3 (= HDF5) files with `h5py`. Every field is an object reference → `f[ref][()]`.
@@ -64,7 +64,7 @@ Reads MATLAB v7.3 (= HDF5) files with `h5py`. Every field is an object reference
 |---|---|---|
 | `charge_segment_features(I, V, t, Qc, T)` | one cycle's curves → 9 scalars (`chg_*`) | Uses only the 1C CC + 3.6 V CV phase that **every** policy shares. CC rows need `Qc > 0.8 Ah` (skips policies that start with a short 1C step). Start voltage / IC window begin at the voltage **minimum** (batch-3 relaxation fix). IC = dQ/dV on a 5 mV grid, Savitzky–Golay (9, 3). |
 | `discharge_features(I, V, t)` | → `dis_time`, `dis_energy` | Label-equivalent on purpose: computed only so the audit can prove it. |
-| `dq_features(qwin, cycles)` | Q(V) in 3.3–2.9 V per cycle → `dq_var_log`, `dq_min_log`, `dq_mean` | ΔQ = Q_k − Q_ref, ref = cycle 10 (or the next valid one). Never the full window to 2.0 V (that would be QD). |
+| `dq_features(qwin, cycles)` | Q(V) in 3.3–2.9 V per cycle → `dq_var_log`, `dq_min_log`, `dq_mean` | ΔQ = Q_k − Q_ref, ref = cycle 10 (or the next valid one); cycles **before** the reference are NaN (no look-ahead). Never the full window to 2.0 V (that would be QD). |
 | `_parse_cell`, `parse_batch` | HDF5 → DataFrame + Q(V) window + policy string | Curves become scalars immediately; 8 GB never sits in RAM. |
 | `build_mit_table(processes=3)` | 3 batches → one table | Drops / stitches cells exactly like the official loader (stitched cycles are offset by the batch-1 length). Adds `cell_index` in official order — the split depends on it. |
 
@@ -98,11 +98,12 @@ Adds `soh` (vs 1.1 Ah) and `soh_init`. Result: 100,373 rows. `soh.predict` runs 
 ## `soh/features.py` — derived features, feature sets, leakage audit
 
 - `CATALOGUE` — `{name: (family, prior status, meaning)}`. Prior status is `safe`, `caution`, `ablation` or `excluded`. `_rm5` entries are generated for every `ROLL_COLS` member and inherit the parent's status.
-- `add_derived(df)` — per cell only: forward-fill → `Trange` → `d_X` (minus baseline) and `r_X` (÷ baseline) for `BASELINE_COLS` → `X_rm5` causal 5-cycle rolling mean for `ROLL_COLS`.
+- `causal_dq(df)` — blanks ΔQ(V) features before each cell's reference cycle (also fixes tables parsed before that rule).
+- `add_derived(df)` — per cell only: `causal_dq` → forward-fill → `Trange` → `d_X` (minus baseline) and `r_X` (÷ baseline) for `BASELINE_COLS` → `X_rm5` causal 5-cycle rolling mean for `ROLL_COLS`.
 - Feature sets (ablation ladder): `A0` cycle only · `A1` IR + temperature · `A2` + 1C charge segment (**BMS model**) · `A3` + partial ΔQ(V) · `A4` + `_rm5` history (**main model**) · `A5` A4 + chargetime · `A6` A4 + cycle.
 - `TRANSFER_COLS` — `r_IR`, `r_chg_t_cv`, `r_chg_cv_tau`: dimensionless, exist in both MIT and NASA (zero-shot transfer).
 - `clip_to_train(df, cols, train_mask, q=0.005)` — clips every feature to the 0.5–99.5 percentile of **training** rows.
-- `leakage_audit(train)` — per feature on training cells: pooled Spearman, median within-cell Spearman, and cross-cell R² of a one-feature tree (`GroupKFold(5)` by cell). Threshold = min R² of the definitional leaks other than QD/QC − `LEAK_MARGIN`; anything at or above it is `EXCLUDED (empirical …)`.
+- `leakage_audit(train)` — per feature on training cells: pooled Spearman, median within-cell Spearman, and cross-cell R² of a one-feature tree (`GroupKFold(5)` by cell). Threshold = min R² of the definitional leaks other than QD/QC − `LEAK_MARGIN`; anything at or above it is `EXCLUDED (empirical …)`. Raises `ValueError` if no known leak is present (a NaN threshold would silently pass everything). An `X_rm5` copy is `EXCLUDED (parent X)` whenever `X` is excluded.
 - `apply_audit(feature_sets, audit)` — removes every excluded feature from every set.
 
 ---
@@ -141,9 +142,9 @@ Adds `soh` (vs 1.1 Ah) and `soh_init`. Result: 100,373 rows. `soh.predict` runs 
 | `regression_metrics(y, p)` | RMSE, MAE, MAPE, R², MaxAE |
 | `band_rmse(y, p)` | RMSE inside true-SOH bands 80–85, 85–90, 90–95, ≥ 95 |
 | `first_crossing(cycles, values, thr)` | first cycle below `thr`, else NaN |
-| `eol_errors(df)` | per cell: predicted − true first crossing of 80.5 % (negative = early = safe) |
+| `eol_errors(df)` | per cell: predicted − true first crossing of 80.5 % (negative = early = safe); NaN when only one of them crosses |
 | `per_cell_metrics(df)` | regression metrics per cell |
-| `full_report(df)` | all of the above plus per-cell mean / median / worst, mean \|EOL error\|, signed EOL error and `EOL_undefined_cells` (= **missed alarms**: truth crossed, estimate never did) |
+| `full_report(df)` | all of the above plus per-cell mean / median / worst, mean \|EOL error\|, signed EOL error and `EOL_undefined_cells` (= **missed alarms**: truth crossed, estimate never did) and `EOL_false_alarm_cells` (estimate crossed, truth never did) |
 
 ---
 
@@ -163,9 +164,9 @@ Static PNGs in `reports/figures/`, one categorical palette `C`, split colours `S
 |---|---|---|
 | `prepare()` | clean → derive → split → audit (training cells, spikes removed) → clip | `data_summary.json`, `leakage_audit.csv`, `models/train_clip_ranges.joblib`, figs 01–02 |
 | `run_tabular()` | Dummy, XGB on `A0`, Ridge / RF / XGB on `A4`; tuned, 3 seeds for RF/XGB | `tabular.json` |
-| `main()` (after `run_tabular`) | picks the showcase model = lowest **primary + secondary** RMSE (Random Forest A4), so a model that fails on the new batch (Ridge) is not showcased | `best_model.json`, `per_cell_*.csv`, figs 03–05 |
+| `main()` (after `run_tabular`) | picks the showcase model = lowest **inner-CV RMSE** on training cells (XGBoost A4, 0.78); test sets are never used for selection | `best_model.json`, `per_cell_*.csv`, figs 03–05 |
 | `run_deep()` | LSTM / GRU / 1D-CNN on `A3` windows (k = 10), plus LSTM k ∈ {5, 10, 20, 30} | `deep.json` |
-| `run_ablation()` | XGB over every feature set; random-row vs cell-wise demo; 10 random cell splits (spike rows leave training only — every test cell keeps all its rows) | `ablation.json`, figs 07, 07b |
+| `run_ablation()` | XGB over every feature set; random-row vs cell-wise demo; 10 random cell splits (in both, spike rows leave the training side only — every held-out row keeps its label) | `ablation.json`, figs 07, 07b |
 | `run_nasa()` | leave-one-battery-out on NASA; MIT → NASA zero-shot on `TRANSFER_COLS` | `nasa.json`, figs 08–09 |
 | `run_explain_and_deploy()` | saves `soh_xgb_main/bms.joblib`, permutation importance, SHAP, footprint, monitor demo | `explain_deploy.json`, `permutation_importance_*.csv`, `shap_mean_abs.csv`, figs 06, 10 |
 | `reproducibility()` | library versions, seeds, git commit | `reproducibility.json` |
@@ -201,3 +202,7 @@ Static PNGs in `reports/figures/`, one categorical palette `C`, split colours `S
 | `test_deep_training_fails_clearly_on_nan_loss` | NaN loss → clear `RuntimeError`, not a crash in `load_state_dict` |
 | `test_rmse_is_shared` | one RMSE definition |
 | `test_download_restarts_oversized_file` | a too-large partial download is deleted and restarted |
+| `test_causal_dq_blanks_cycles_before_reference` | no ΔQ(V) value before cycle 10 |
+| `test_audit_refuses_to_run_without_known_leaks` | uncalibratable audit raises instead of passing everything |
+| `test_rm5_copy_inherits_excluded_parent` | a smoothed copy of a leak is a leak |
+| `test_false_eol_alarm_is_counted` | pessimistic estimate → counted as a false alarm |
