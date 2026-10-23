@@ -57,6 +57,15 @@ def test_dq_reference_cycle_is_zero():
     res = dq_features(q.astype(np.float32), cycles)
     ref_row = np.where(cycles == 10)[0][0]
     assert res[ref_row, 2] == 0 and res[-1, 2] < 0      # later cycles lose capacity
+    assert np.isnan(res[:ref_row]).all()                # no look-ahead: before cycle 10 is unknown
+
+
+def test_causal_dq_blanks_cycles_before_reference():
+    df = pd.DataFrame({"cell_id": "a", "cycle": np.arange(2, 20), "dq_var_log": 1.0,
+                       "dq_min_log": 1.0, "dq_mean": -0.1})
+    df.loc[df["cycle"] == 10, "dq_mean"] = 0.0
+    out = features.causal_dq(df)
+    assert out.loc[out["cycle"] < 10, "dq_mean"].isna().all() and out.loc[out["cycle"] >= 10, "dq_mean"].notna().all()
 
 
 def test_official_split_sizes_and_disjoint():
@@ -156,3 +165,32 @@ def test_download_restarts_oversized_file(tmp_path, monkeypatch):
     f.write_bytes(b"0123456789")                  # bigger than the real 5-byte file
     download._fetch("http://example", f, expected_size=5)
     assert f.read_bytes() == b"12345" and seen == [{}]   # restarted from 0, no Range header
+
+
+def test_audit_refuses_to_run_without_known_leaks():
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"cell_id": np.repeat([f"c{i}" for i in range(10)], 30), "soh": rng.uniform(80, 100, 300),
+                       "IR": rng.normal(0.02, 0.001, 300)})
+    with pytest.raises(ValueError, match="calibrate"):
+        features.leakage_audit(df)
+
+
+def test_rm5_copy_inherits_excluded_parent():
+    rng = np.random.default_rng(1)
+    rows = []
+    for c in range(12):
+        soh = 100 - np.arange(120) * rng.uniform(0.05, 0.15)
+        rows.append(pd.DataFrame({"cell_id": f"c{c}", "cycle": np.arange(120), "soh": soh,
+                                  "dis_time": soh * 0.14 + rng.normal(0, 0.3, 120),   # known leak, noisy
+                                  "chg_v_start": soh,                                  # a perfect leak
+                                  "chg_v_start_rm5": rng.normal(0, 1, 120)}))          # copy = noise
+    a = features.leakage_audit(pd.concat(rows, ignore_index=True)).set_index("feature")
+    assert a.loc["chg_v_start", "status"].startswith("EXCLUDED (empirical")
+    assert a.loc["chg_v_start_rm5", "status"] == "EXCLUDED (parent chg_v_start)"
+
+
+def test_false_eol_alarm_is_counted():
+    d = pd.DataFrame({"cell_id": "a", "cycle": np.arange(50), "soh": np.linspace(95, 85, 50)})
+    d["pred"] = d["soh"] - 6                        # pessimistic: alarms although the cell never ends
+    m = metrics.full_report(d)
+    assert m["EOL_false_alarm_cells"] == 1 and m["EOL_undefined_cells"] == 0

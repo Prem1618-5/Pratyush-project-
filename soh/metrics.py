@@ -42,7 +42,8 @@ def first_crossing(cycles, values, threshold):
 def eol_errors(df, pred_col="pred", label="soh", eol=config.EOL_ALARM_SOH):
     """Per cell: (first cycle predicted SOH < alarm) - (first cycle true SOH < alarm), in cycles.
     Negative = the BMS would raise the end-of-life alarm early (safe side).
-    Cells where either never crosses are counted separately (error undefined)."""
+    Cells where only one of the two crosses have no error: full_report counts them as missed
+    alarms (truth crossed, estimate did not) or false alarms (estimate crossed, truth did not)."""
     rows = []
     for cid, d in df.sort_values("cycle").groupby("cell_id"):
         t = first_crossing(d["cycle"], d[label], eol)
@@ -68,5 +69,7 @@ def full_report(df, pred_col="pred", label="soh"):
     ok = eol["eol_error"].notna()
     m["EOL_abs_err_mean"] = float(eol.loc[ok, "eol_error"].abs().mean()) if ok.any() else np.nan
     m["EOL_err_signed_mean"] = float(eol.loc[ok, "eol_error"].mean()) if ok.any() else np.nan
-    m["EOL_undefined_cells"] = int((~ok & eol["true_eol"].notna()).sum())
+    m["EOL_undefined_cells"] = int((~ok & eol["true_eol"].notna()).sum())   # missed alarms
+    # false alarms: estimate crossed the alarm level, the cell never did (premature replacement)
+    m["EOL_false_alarm_cells"] = int((eol["pred_eol"].notna() & eol["true_eol"].isna()).sum())
     return m

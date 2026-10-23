@@ -57,9 +57,23 @@ for c in ROLL_COLS:
     CATALOGUE[f"{c}_rm5"] = ("F8 history", status, f"5-cycle causal rolling mean of {c}")
 
 
+DQ_COLS = ["dq_var_log", "dq_min_log", "dq_mean"]
+
+
+def causal_dq(df):
+    """dQ(V) = Q_k(V) - Q_ref(V) needs the reference cycle (10) to exist: blank every earlier cycle.
+    Also applied here (not only in the loader) so tables parsed before this rule are fixed too."""
+    if not set(DQ_COLS) <= set(df.columns):
+        return df
+    ok = (df["cycle"] >= config.DQ_REF_CYCLE) & df["dq_mean"].notna()
+    ref = df["cycle"].where(ok).groupby(df["cell_id"]).transform("min")
+    df.loc[~(df["cycle"] >= ref), DQ_COLS] = np.nan     # NaN ref (no valid cycle) blanks the cell
+    return df
+
+
 def add_derived(df, baseline_cycles=config.BASELINE_CYCLES):
     """Per-cell derived features. Every operation is grouped by cell, so no window spans two cells."""
-    df = df.sort_values(["cell_id", "cycle"]).copy()
+    df = causal_dq(df.sort_values(["cell_id", "cycle"]).copy())
     g = df.groupby("cell_id", sort=False)
     feat_cols = [c for c in CATALOGUE if c in df.columns and c not in ("QD", "cycle")]
     # carry the last good measurement forward inside a cell (what a BMS would do)
@@ -142,7 +156,10 @@ def leakage_audit(train, label="soh", margin=config.LEAK_MARGIN):
                          spearman_within=np.nanmedian(within), r2_single_cv=r2,
                          coverage=ok.mean(), meaning=meaning))
     a = pd.DataFrame(rows)
-    known = a[(a["prior"] == "excluded") & ~a["feature"].isin(["QD", "QC"])]["r2_single_cv"]
+    known = a[(a["prior"] == "excluded") & ~a["feature"].isin(["QD", "QC"])]["r2_single_cv"].dropna()
+    if known.empty:   # no disguised label to calibrate on: a NaN threshold would silently pass every feature
+        raise ValueError("leakage_audit needs at least one known label-equivalent feature "
+                         "(dis_time, dis_energy, chg_t_cc, chg_q_cc) to calibrate its threshold")
     threshold = float(known.min() - margin)
 
     def status(r):
@@ -152,5 +169,11 @@ def leakage_audit(train, label="soh", margin=config.LEAK_MARGIN):
             return f"EXCLUDED (empirical: R2 >= {threshold:.3f})"
         return r["prior"]
     a.insert(a.columns.get_loc("meaning"), "status", a.apply(status, axis=1))
+    # a smoothed copy is the same signal: X_rm5 is excluded whenever its parent X is
+    parent = a.set_index("feature")["status"]
+    rm5 = a["feature"].str.endswith("_rm5")
+    par = a.loc[rm5, "feature"].str[:-4].map(parent)
+    inherit = rm5 & par.reindex(a.index).fillna("").str.startswith("EXCLUDED")
+    a.loc[inherit, "status"] = "EXCLUDED (parent " + a.loc[inherit, "feature"].str[:-4] + ")"
     a.attrs["threshold"] = threshold
     return a

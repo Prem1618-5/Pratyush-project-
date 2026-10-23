@@ -112,7 +112,7 @@ def run_tabular(df, fsets, train_rows, seeds):
         res, preds, model = fit_eval_tabular(name, f, tr, tests, s, params)
         key = f"{label} | {fset}"
         out[key] = res
-        store[key] = (preds, model, f, params)
+        store[key] = (preds, model, f, params, tune.get("cv_rmse", np.inf))
         print(f"[tabular] {key:40s} primary RMSE {res['test_primary']['RMSE']['mean']:.3f}  "
               f"secondary {res['test_secondary']['RMSE']['mean']:.3f}  ({time.time() - t0:.0f}s)",
               flush=True)
@@ -182,7 +182,10 @@ def run_ablation(df, fsets, train_rows, seeds, xgb_params):
               f"secondary {res['test_secondary']['RMSE']['mean']:.3f}", flush=True)
 
     # A7 / leakage demo: same pool of cells (train + primary), random ROWS vs whole CELLS
-    pool = df[df["split"].isin(["train", "test_primary"]) & ~df["flag_qd_outlier"]].reset_index(drop=True)
+    # spike rows are dropped from the TRAINING side only, so both held-out sets keep every row,
+    # exactly like the headline primary-test numbers
+    pool = df[df["split"].isin(["train", "test_primary"])].reset_index(drop=True)
+    clean = ~pool["flag_qd_outlier"]
     feats = fsets[features.MAIN_SET]
     leak = {}
     for name in ("rf", "xgb"):
@@ -190,12 +193,12 @@ def run_ablation(df, fsets, train_rows, seeds, xgb_params):
         for seed in seeds:
             a, b = splits.random_row_split(len(pool), test_frac=0.5, seed=seed)
             m = _model(name, seed, xgb_params)
-            m.fit(pool.loc[a, feats], pool.loc[a, LABEL])
+            m.fit(pool.loc[a & clean, feats], pool.loc[a & clean, LABEL])
             row_rmse.append(metrics.regression_metrics(pool.loc[b, LABEL], m.predict(pool.loc[b, feats]))["RMSE"])
             tr_c, te_c = splits.random_cell_split(pool["cell_id"].unique(), test_frac=0.5, seed=seed)
             a = pool["cell_id"].isin(tr_c)
             m = _model(name, seed, xgb_params)
-            m.fit(pool.loc[a, feats], pool.loc[a, LABEL])
+            m.fit(pool.loc[a & clean, feats], pool.loc[a & clean, LABEL])
             cell_rmse.append(metrics.regression_metrics(pool.loc[~a, LABEL], m.predict(pool.loc[~a, feats]))["RMSE"])
         leak[name] = {"random_row_rmse": np.mean(row_rmse), "random_row_std": np.std(row_rmse),
                       "cell_wise_rmse": np.mean(cell_rmse), "cell_wise_std": np.std(cell_rmse),
@@ -305,7 +308,7 @@ def run_explain_and_deploy(df, fsets, train_rows, xgb_params, store):
             c["pred"] = model.predict(c[feats])
             figs["monitor"] = plots.health_monitor(c, cell)
     for key in ("Random Forest | A4_plus_history", "Ridge | A4_plus_history"):
-        _, model, feats, _ = store[key]
+        _, model, feats, _, _ = store[key]
         buf = io.BytesIO()
         joblib.dump(model, buf)
         one = prim[feats].iloc[[100]]
@@ -343,11 +346,12 @@ def main(quick=False, skip_deep=False):
 
     tab, store, tuned = run_tabular(df, fsets, train_rows, seeds)
     xgb_params = tuned[f"xgb|{features.MAIN_SET}"]["params"]
-    # "best" = lowest mean of primary and secondary RMSE: a model that is excellent on familiar
-    # cells but fails on a new batch (Ridge here) should not be the one we showcase
-    best_key = min(tab, key=lambda k: tab[k]["test_primary"]["RMSE"]["mean"] + tab[k]["test_secondary"]["RMSE"]["mean"])
-    _save_json({"best_model": best_key}, "best_model.json")
-    preds, _, _, _ = store[best_key]
+    # "best" = lowest inner-CV RMSE (GroupKFold on TRAINING cells, from tuning). Choosing by test
+    # RMSE would be model selection on the test sets and bias the numbers shown for that model.
+    best_key = min(store, key=lambda k: store[k][4])
+    _save_json({"best_model": best_key, "selected_by": "inner-CV RMSE on training cells",
+                "cv_rmse": store[best_key][4]}, "best_model.json")
+    preds = store[best_key][0]
     plots.pred_vs_true(preds, best_key)
     for split in ("test_primary", "test_secondary"):
         pc = metrics.per_cell_metrics(preds[split])

@@ -46,7 +46,7 @@ def download_nasa():
     zpath = config.RAW_DIR / "nasa_battery.zip"
     _fetch(config.NASA_URL, zpath, config.NASA_ZIP_BYTES)
     out = config.RAW_DIR / "nasa"
-    if not (out / "B0005.mat").exists():
+    if not all((out / f"{c}.mat").exists() for c in config.NASA_CELLS):   # repairs a partial unzip
         out.mkdir(exist_ok=True)
         # outer zip contains inner zips; B0005/6/7/18 are in "1. BatteryAgingARC-FY08Q4.zip"
         with zipfile.ZipFile(zpath) as z:

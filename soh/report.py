@@ -48,7 +48,7 @@ def build():
           md_table(["Step", "Rows / count"], [
               ["Raw per-cycle rows (124 cells after official cleaning, 140 raw)", f"{c['rows_raw']:,}"],
               ["Dropped: cycle 1", c["drop_cycle1"]],
-              ["Dropped: impossible QD (<=0 or >1.2 Ah)", c["drop_impossible_QD"]],
+              ["Dropped: impossible QD (<= 0 or >= 1.2 Ah)", c["drop_impossible_QD"]],
               ["Flagged QD spikes (removed from TRAINING only)", c["flag_qd_outlier"]],
               ["Flagged IR glitches (set NaN, carried forward)", c["flag_ir_bad"]],
               ["Flagged temperature excursions (set NaN, carried forward)", c["flag_temp_bad"]],
@@ -59,12 +59,16 @@ def build():
 
     # ---------------------------------------------------------------- audit
     audit = pd.read_csv(RES / "leakage_audit.csv")
+    rm5 = audit[audit["feature"].str.endswith("_rm5")]
+    rm5_out = rm5.loc[rm5["status"].str.startswith("EXCLUDED"), "feature"].tolist()
     audit = audit[~audit["feature"].str.endswith("_rm5")]
     L += ["## 2. Leakage audit (O2)", "",
           "Each feature alone, on training cells only. `r2_single_cv` = cross-cell R² of a 1-feature "
           "tree (GroupKFold by cell). Threshold calibrated on known disguised labels: "
-          f"**R² ≥ {c['leak_threshold']:.3f} ⇒ label-equivalent**. Rolling-mean (`_rm5`) copies "
-          "inherit their parent's status and are omitted here.", "",
+          f"**R² ≥ {c['leak_threshold']:.3f} ⇒ label-equivalent**. Rolling-mean (`_rm5`) copies are "
+          "scored too and are excluded if they score above the threshold themselves or their parent "
+          "is excluded; they are omitted from this table (see `results/leakage_audit.csv`). "
+          f"Excluded `_rm5` copies: {', '.join(rm5_out) if rm5_out else 'none'}.", "",
           md_table(["Feature", "Family", "Spearman (pooled)", "Spearman (within cell)", "Single-feature R²",
                     "Status", "Meaning"],
                    [[r.feature, r.family, f"{r.spearman_pooled:.2f}", f"{r.spearman_within:.2f}",
@@ -83,18 +87,24 @@ def build():
                      ms(s["RMSE"]), ms(s["MAE"]), ms(p["RMSE_80-85"]), ms(s["RMSE_80-85"]),
                      ms(p["EOL_abs_err_mean"], 0), f"{p['EOL_undefined_cells']['mean']:.0f} / 43",
                      f"{s['EOL_undefined_cells']['mean']:.0f} / 40",
+                     f"{p.get('EOL_false_alarm_cells', {'mean': float('nan')})['mean']:.0f}",
+                     f"{s.get('EOL_false_alarm_cells', {'mean': float('nan')})['mean']:.0f}",
                      ms(p["cell_RMSE_worst"]), ms(s["cell_RMSE_worst"])])
     L += ["## 3. Main results — template R1 (O3)", "",
           md_table(["Model", "Features", "Primary RMSE", "Primary MAE", "Primary MAPE %", "Primary R²",
                     "Secondary RMSE", "Secondary MAE", "EOL-band (80–85 %) RMSE prim.",
                     "EOL-band RMSE sec.", "Mean \\|EOL error\\| prim. (cycles, alarmed cells)",
-                    "Missed EOL alarms prim.", "Missed EOL alarms sec.", "Worst-cell RMSE prim.", "Worst-cell RMSE sec."], rows),
+                    "Missed EOL alarms prim.", "Missed EOL alarms sec.", "False EOL alarms prim.",
+                    "False EOL alarms sec.", "Worst-cell RMSE prim.", "Worst-cell RMSE sec."], rows),
           "", f"EOL error uses an alarm at {config.EOL_ALARM_SOH} % SOH (batch-3 cells stop at "
           "80.0–80.15 %, so a strict 80 % crossing never occurs there). It is computed on raw, "
           "unsmoothed per-cycle estimates, so a single noisy low estimate triggers an early alarm. "
           "A **missed alarm** = the cell truly crossed the alarm level but the estimate never did "
-          "(the model is optimistic near end of life) — the dangerous failure mode for a BMS.", "",
-          f"Figures below use the model with the lowest mean of primary and secondary RMSE: "
+          "(the model is optimistic near end of life) — the dangerous failure mode for a BMS. A "
+          "**false alarm** = the estimate crossed the alarm level but the cell never did "
+          "(premature replacement).", "",
+          "Figures below use the tuned model with the lowest inner-CV RMSE on the training cells "
+          "(chosen without looking at either test set): "
           f"**{(_load('best_model.json') or {}).get('best_model', '')}**.", "",
           "![pred vs true](figures/03_pred_vs_true.png)", "",
           "![trajectories primary](figures/04_trajectories_test_primary.png)", "",

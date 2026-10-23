@@ -105,6 +105,7 @@ def dq_features(qwin, cycles):
     """Severson-style dQ(V) features in a PARTIAL window (3.3 -> 2.9 V).
 
     dQ_k(V) = Q_k(V) - Q_ref(V), ref = cycle 10 (or the nearest valid later cycle).
+    Cycles BEFORE the reference stay NaN: they would need a curve that has not been measured yet.
     """
     n = len(cycles)
     res = np.full((n, 3), np.nan)
@@ -119,6 +120,7 @@ def dq_features(qwin, cycles):
         res[:, 1] = np.log10(np.abs(np.min(dq, axis=1)) + 1e-10)
         res[:, 2] = np.mean(dq, axis=1)
     res[~ok] = np.nan
+    res[cycles < cycles[cand[0]]] = np.nan          # causal: no look-ahead to the reference cycle
     return res
 
 
