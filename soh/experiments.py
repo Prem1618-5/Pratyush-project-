@@ -32,6 +32,11 @@ def _save_json(obj, name):
     (RES / name).write_text(json.dumps(obj, indent=2, default=float))
 
 
+def _model(name, seed, xgb_params):
+    """Untrained model; XGBoost gets the parameters tuned once on the main feature set."""
+    return tabular.make_model(name, seed, **(xgb_params if name == "xgb" else {}))
+
+
 def _agg(reports):
     """mean and std over seeds for every metric."""
     df = pd.DataFrame(reports)
@@ -184,12 +189,12 @@ def run_ablation(df, fsets, train_rows, seeds, xgb_params):
         row_rmse, cell_rmse = [], []
         for seed in seeds:
             a, b = splits.random_row_split(len(pool), test_frac=0.5, seed=seed)
-            m = tabular.make_model(name, seed, **(xgb_params if name == "xgb" else {}))
+            m = _model(name, seed, xgb_params)
             m.fit(pool.loc[a, feats], pool.loc[a, LABEL])
             row_rmse.append(metrics.regression_metrics(pool.loc[b, LABEL], m.predict(pool.loc[b, feats]))["RMSE"])
             tr_c, te_c = splits.random_cell_split(pool["cell_id"].unique(), test_frac=0.5, seed=seed)
             a = pool["cell_id"].isin(tr_c)
-            m = tabular.make_model(name, seed, **(xgb_params if name == "xgb" else {}))
+            m = _model(name, seed, xgb_params)
             m.fit(pool.loc[a, feats], pool.loc[a, LABEL])
             cell_rmse.append(metrics.regression_metrics(pool.loc[~a, LABEL], m.predict(pool.loc[~a, feats]))["RMSE"])
         leak[name] = {"random_row_rmse": np.mean(row_rmse), "random_row_std": np.std(row_rmse),
@@ -200,13 +205,13 @@ def run_ablation(df, fsets, train_rows, seeds, xgb_params):
                                                              "std": leak["xgb"]["random_row_std"]}}}
 
     # robustness: 10 random 80/20 CELL splits over all 124 cells
-    allc = df[~df["flag_qd_outlier"] | (df["split"] != "train")]
+    # same rule for every cell: spike rows leave TRAINING only; test cells keep every row
     rob = []
     for seed in range(10):
         tr_c, te_c = splits.random_cell_split(df["cell_id"].unique(), 0.2, seed=seed)
-        a = allc[allc["cell_id"].isin(tr_c) & ~allc["flag_qd_outlier"]]
-        b = allc[allc["cell_id"].isin(te_c)]
-        m = tabular.make_model("xgb", seed, **xgb_params).fit(a[feats], a[LABEL])
+        a = df[df["cell_id"].isin(tr_c) & ~df["flag_qd_outlier"]]
+        b = df[df["cell_id"].isin(te_c)]
+        m = _model("xgb", seed, xgb_params).fit(a[feats], a[LABEL])
         rob.append(metrics.regression_metrics(b[LABEL], m.predict(b[feats]))["RMSE"])
     robust = {"rmse_each": rob, "mean": float(np.mean(rob)), "std": float(np.std(rob))}
     print(f"[robust] 10 random cell splits: RMSE {robust['mean']:.3f} +/- {robust['std']:.3f}")
@@ -231,7 +236,7 @@ def run_nasa(df, train_rows, seeds, xgb_params):
         allp = []
         for cell in config.NASA_CELLS:
             a, b = nasa[nasa["cell_id"] != cell], nasa[nasa["cell_id"] == cell]
-            m = tabular.make_model(name, 0, **(xgb_params if name == "xgb" else {}))
+            m = _model(name, 0, xgb_params)
             m.fit(a[NASA_FEATS], a[LABEL])
             p = b[["cell_id", "cycle", LABEL]].copy()
             p["pred"] = m.predict(b[NASA_FEATS])
@@ -245,7 +250,7 @@ def run_nasa(df, train_rows, seeds, xgb_params):
     tr = df[train_rows].dropna(subset=features.TRANSFER_COLS)
     prim = df[df["split"] == "test_primary"]
     for name in ("rf", "xgb"):
-        m = tabular.make_model(name, 0, **(xgb_params if name == "xgb" else {}))
+        m = _model(name, 0, xgb_params)
         m.fit(tr[features.TRANSFER_COLS], tr["soh_init"])
         p = nasa[["cell_id", "cycle", "soh_init"]].copy()
         p["pred"] = m.predict(nasa[features.TRANSFER_COLS])
@@ -275,7 +280,7 @@ def run_explain_and_deploy(df, fsets, train_rows, xgb_params, store):
     sample = prim.iloc[rng.choice(len(prim), 4000, replace=False)]
     for tag, fset in [("main", features.MAIN_SET), ("bms", features.BMS_SET)]:
         feats = fsets[fset]
-        model = tabular.make_model("xgb", 0, **xgb_params).fit(tr[feats], tr[LABEL])
+        model = _model("xgb", 0, xgb_params).fit(tr[feats], tr[LABEL])
         path = config.MODELS_DIR / f"soh_xgb_{tag}.joblib"
         joblib.dump({"model": model, "features": feats, "feature_set": fset, "label": "SOH %",
                      "rated_ah": config.MIT_RATED_AH}, path)

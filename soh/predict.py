@@ -9,6 +9,10 @@ needs (for the default BMS model: IR, Tavg, Tmin, Tmax and the 1C/CV charge-segm
 features produced by soh.data.mit_loader.charge_segment_features). Optional `QD` column
 (measured capacity, Ah) is used only to report the error.
 
+The input is cleaned with the SAME rules as the training data (soh.preprocess): cycle 1 and
+impossible QD rows are dropped, IR glitches and temperature excursions become NaN and the
+last good value is carried forward.
+
 Output per cycle:  est_capacity_Ah, est_SOH_%, status
     SOH = present capacity / rated capacity x 100
 """
@@ -18,9 +22,11 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from soh import config, features
+from soh import config, features, metrics, preprocess
 
-STATUS = [(90.0, "HEALTHY"), (80.0, "MONITOR"), (-np.inf, "REPLACE / SECOND-LIFE")]
+# REPLACE uses the project's EOL alarm level (80.5 %), not 80 %: batch-3 cells stop at
+# 80.0-80.15 % and would otherwise never be flagged (see config.EOL_ALARM_SOH).
+STATUS = [(90.0, "HEALTHY"), (config.EOL_ALARM_SOH, "MONITOR"), (-np.inf, "REPLACE / SECOND-LIFE")]
 
 
 def health_status(soh):
@@ -37,7 +43,8 @@ def estimate(cycles, kind="bms", smooth=5):
     """cycles: raw per-cycle measurements (one or many cells). Returns a copy with estimates."""
     bundle = load_model(kind)
     clip = joblib.load(config.MODELS_DIR / "train_clip_ranges.joblib")
-    df = features.add_derived(cycles)
+    df, _ = preprocess.drop_invalid_rows(cycles.sort_values(["cell_id", "cycle"]))
+    df = features.add_derived(preprocess.clean_measurements(df))
     feats = bundle["features"]
     missing = [f for f in feats if f not in df.columns]
     if missing:
@@ -75,8 +82,8 @@ def main():
     with pd.option_context("display.width", 200):
         print(out.iloc[np.linspace(0, len(out) - 1, 12).astype(int)].round(3).to_string(index=False))
     if "measured_SOH_%" in out:
-        e = out["est_SOH_%"] - out["measured_SOH_%"]
-        print(f"\nRMSE vs measured: {np.sqrt(np.mean(e ** 2)):.2f} % SOH over {len(out)} cycles")
+        rmse = metrics.rmse(out["measured_SOH_%"], out["est_SOH_%"])
+        print(f"\nRMSE vs measured: {rmse:.2f} % SOH over {len(out)} cycles")
     print(f"wrote {a.out}")
 
 

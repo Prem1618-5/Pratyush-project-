@@ -4,12 +4,15 @@ One row per *discharge* (that is where the reference capacity is measured). Feat
 come from the charge that preceded it (CC 1.5 A to 4.2 V, then CV to 20 mA) and from
 the most recent EIS impedance test (Re + Rct is used as the resistance analogue of
 MIT's pulse IR). Time is converted to minutes to match MIT.
+
+Everything is causal: a discharge only gets the charge that preceded it (NaN if there was
+none since the previous discharge) and the latest EIS test BEFORE it (NaN until the first one).
 """
 import numpy as np
 import pandas as pd
 import scipy.io as sio
 
-from soh import config
+from soh import config, preprocess
 
 
 def _charge_features(d):
@@ -50,17 +53,19 @@ def load_cell(cell):
                  "Re": last_imp[0], "Rct": last_imp[1], "IR": last_imp[0] + last_imp[1],
                  "Tmax_dis": float(np.max(d["Temperature_measured"]))}
             r.update(last_charge or {})
+            last_charge = None                      # a charge belongs to ONE discharge only
             rows.append(r)
     return pd.DataFrame(rows)
 
 
 def build_nasa_table():
     df = pd.concat([load_cell(c) for c in config.NASA_CELLS], ignore_index=True)
-    # Re/Rct are only measured every few cycles: carry the last value forward, back-fill the start
-    df[["Re", "Rct", "IR"]] = df.groupby("cell_id")[["Re", "Rct", "IR"]].transform(lambda s: s.ffill().bfill())
+    # Re/Rct are only measured every few cycles: carry the last value forward. No back-fill:
+    # discharges before a cell's first valid EIS test (19 in B0005/6/7) stay NaN, because a
+    # back-filled value would come from the future.
+    df[["Re", "Rct", "IR"]] = df.groupby("cell_id")[["Re", "Rct", "IR"]].ffill()
     df["soh"] = df["QD"] / config.NASA_RATED_AH * 100
-    first = df.groupby("cell_id")["QD"].transform("first")
-    df["soh_init"] = df["QD"] / first * 100
+    df["soh_init"] = preprocess.soh_init(df)
     return df
 
 

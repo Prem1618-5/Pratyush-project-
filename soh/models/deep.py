@@ -104,6 +104,9 @@ def train_net(name, Xtr, ytr, Xva, yva, seed=0, epochs=40, patience=6, batch=128
             bad += 1
             if bad >= patience:
                 break
+    if best_state is None:     # loss was never finite: NaN in the inputs, or training diverged
+        raise RuntimeError(f"{name}: validation loss never finite (last {v}); check for all-NaN "
+                           "feature columns or lower the learning rate")
     net.load_state_dict(best_state)
     net.eval()
     return {"net": net, "scaler": scaler, "mu": mu, "sd": sd, "epochs": ep + 1,

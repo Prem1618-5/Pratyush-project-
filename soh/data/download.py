@@ -17,9 +17,17 @@ def _fetch(url, dest, expected_size=None):
         print(f"[ok] {dest.name} already complete")
         return
     have = dest.stat().st_size if dest.exists() else 0
+    if expected_size and have > expected_size:          # larger than the real file: corrupt, restart
+        print(f"[bad] {dest.name} is {have:,} bytes > expected {expected_size:,}; restarting")
+        dest.unlink()
+        have = 0
     headers = {"Range": f"bytes={have}-"} if have else {}
     print(f"[get] {dest.name} (resume from {have:,} bytes)")
     with requests.get(url, stream=True, headers=headers, timeout=60) as r:
+        if r.status_code == 416:                        # server cannot resume from here: restart
+            print(f"[bad] {dest.name}: server refused to resume; restarting")
+            dest.unlink()
+            return _fetch(url, dest, expected_size)
         r.raise_for_status()
         mode = "ab" if r.status_code == 206 else "wb"
         with open(dest, mode) as fh:

@@ -136,8 +136,10 @@ split the credit.
 ## 9. Use in a BMS — `soh/predict.py`
 
 `python -m soh.predict --demo` prints estimated capacity (Ah), SOH and a status
-(HEALTHY ≥ 90 %, MONITOR 80–90 %, REPLACE/second-life < 80 %) for an unseen cell, using the
-**BMS model** (charge segment + IR + temperature only; no lab discharge needed).
+(HEALTHY ≥ 90 %, MONITOR 80.5–90 %, REPLACE/second-life < 80.5 %, the same EOL alarm level as §7) for an unseen cell, using the
+**BMS model** (charge segment + IR + temperature only; no lab discharge needed). The input goes through
+the **same cleaning rules as training** (`preprocess.drop_invalid_rows`, `clean_measurements`): a model
+must see data prepared exactly like the data it learned from.
 
 > ✅ **Verified.** The demo cell b3c0 (1,007 cycles, never seen in training) gets RMSE **1.24 % SOH**.
 > Footprint: 1,000 trees, depth ≤ 6, 3.5 MB, ~2 ms per cycle in Python on one CPU core.

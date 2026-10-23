@@ -1,10 +1,12 @@
 """Fast tests on synthetic data (no 8 GB download needed):  pytest -q"""
 import numpy as np
 import pandas as pd
+import pytest
 
-from soh import features, metrics, splits
+from soh import config, features, metrics, preprocess, splits
 from soh.data.mit_loader import charge_segment_features, discharge_features, dq_features
-from soh.models.deep import build_windows
+from soh.models.deep import build_windows, train_net
+from soh.predict import health_status
 
 
 def synthetic_cycle(cap=1.05):
@@ -101,3 +103,56 @@ def test_clip_uses_training_rows_only():
     df = pd.DataFrame({"x": [0.0, 1.0, 2.0, 100.0]})
     out, _ = features.clip_to_train(df, ["x"], np.array([True, True, True, False]), q=0.0)
     assert out["x"].max() == 2.0
+
+
+def test_inference_cleaning_matches_training():
+    """soh.predict uses the same rules as training: cycle 1 dropped, IR <= 0 blanked; QD optional."""
+    df = pd.DataFrame({"cell_id": "a", "cycle": np.arange(1, 31), "IR": 0.02, "Tavg": 30.0,
+                       "Tmin": 29.0, "Tmax": 31.0})
+    df.loc[df["cycle"] == 12, "IR"] = 0.0
+    kept, log = preprocess.drop_invalid_rows(df)
+    out = preprocess.clean_measurements(kept)
+    assert log["drop_cycle1"] == 1 and out["cycle"].min() == 2
+    assert np.isnan(out.loc[out["cycle"] == 12, "IR"]).all() and out["IR"].notna().sum() == 28
+
+
+def test_replace_status_uses_eol_alarm_level():
+    """Batch-3 cells end at 80.0-80.15 % SOH; they must reach REPLACE, not stay in MONITOR."""
+    assert health_status(80.1) == "REPLACE / SECOND-LIFE"
+    assert health_status(config.EOL_ALARM_SOH) == "MONITOR" and health_status(95) == "HEALTHY"
+
+
+def test_soh_init_ignores_one_noisy_first_cycle():
+    qd = np.full(20, 1.05)
+    qd[0] = 1.10                                  # noisy first measurement
+    df = pd.DataFrame({"cell_id": "a", "QD": qd})
+    assert abs(preprocess.soh_init(df).iloc[5] - 100.0) < 1e-9
+
+
+def test_deep_training_fails_clearly_on_nan_loss():
+    X = np.full((40, 3, 2), np.nan, np.float32)  # all-NaN feature -> NaN scaler -> NaN loss
+    y = np.linspace(80, 100, 40).astype(np.float32)
+    with pytest.raises(RuntimeError, match="never finite"):
+        train_net("cnn", X, y, X, y, epochs=2)
+
+
+def test_rmse_is_shared():
+    assert metrics.rmse([1, 2], [2, 3]) == 1.0 == metrics.regression_metrics([1, 2], [2, 3])["RMSE"]
+
+
+def test_download_restarts_oversized_file(tmp_path, monkeypatch):
+    from soh.data import download
+
+    class Resp:
+        status_code = 200
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def raise_for_status(self): pass
+        def iter_content(self, chunk_size): yield b"12345"
+
+    seen = []
+    monkeypatch.setattr(download.requests, "get", lambda url, headers, **kw: seen.append(headers) or Resp())
+    f = tmp_path / "x.bin"
+    f.write_bytes(b"0123456789")                  # bigger than the real 5-byte file
+    download._fetch("http://example", f, expected_size=5)
+    assert f.read_bytes() == b"12345" and seen == [{}]   # restarted from 0, no Range header

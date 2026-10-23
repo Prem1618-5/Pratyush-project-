@@ -7,7 +7,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import shap  # noqa: E402
 
-from soh import config  # noqa: E402
+from soh import config, metrics  # noqa: E402
 
 
 def feature_group(name):
@@ -22,7 +22,7 @@ def feature_group(name):
 
 def grouped_permutation_importance(predict, X, y, n_repeats=5, seed=0):
     rng = np.random.default_rng(seed)
-    base_rmse = np.sqrt(np.mean((predict(X) - y) ** 2))
+    base_rmse = metrics.rmse(y, predict(X))
     groups = {}
     for c in X.columns:
         groups.setdefault(feature_group(c), []).append(c)
@@ -33,7 +33,7 @@ def grouped_permutation_importance(predict, X, y, n_repeats=5, seed=0):
             Xp = X.copy()
             perm = rng.permutation(len(X))
             Xp[cols] = X[cols].to_numpy()[perm]
-            incs.append(np.sqrt(np.mean((predict(Xp) - y) ** 2)) - base_rmse)
+            incs.append(metrics.rmse(y, predict(Xp)) - base_rmse)
         rows.append({"group": g, "features": ", ".join(cols), "rmse_increase": np.mean(incs),
                      "std": np.std(incs)})
     return pd.DataFrame(rows).sort_values("rmse_increase", ascending=False)

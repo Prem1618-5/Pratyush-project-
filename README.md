@@ -110,7 +110,7 @@ models/                  deployable XGBoost models (main = A4, bms = A2) + train
   shrinking the tree count would cut that). The 1D-CNN is 10.6k parameters. An unlimited-depth Random
   Forest is ~730 MB, impractical on an MCU.
 - **Monitoring logic.** `soh.predict` smooths the per-cycle estimate (5-cycle median) and maps it to
-  HEALTHY (≥ 90 %), MONITOR (80–90 %) and REPLACE / second-life (< 80 %). Given finding 6, a
+  HEALTHY (≥ 90 %), MONITOR (80.5–90 %) and REPLACE / second-life (< 80.5 %, the EOL alarm level). Given finding 6, a
   production BMS should add an uncertainty margin and use occasional reference capacity checks.
 - **Fleet loop.** The on-board model sends features plus occasional reference capacities to the cloud,
   the cloud retrains on the new batch, and the model is updated over the air. Finding 4 is the evidence:

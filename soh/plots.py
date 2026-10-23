@@ -5,7 +5,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from soh import config  # noqa: E402
+from soh import config, metrics  # noqa: E402
 
 # Validated categorical palette (dataviz reference palette, light mode), fixed order.
 C = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
@@ -61,7 +61,7 @@ def pred_vs_true(preds, model_name):
         ax.scatter(d["soh"], d["pred"], s=2, alpha=0.2, color=SPLIT_COLOR[split], rasterized=True)
         lo, hi = 75, 103
         ax.plot([lo, hi], [lo, hi], color=INK, lw=0.8)
-        rmse = np.sqrt(np.mean((d["pred"] - d["soh"]) ** 2))
+        rmse = metrics.rmse(d["soh"], d["pred"])
         ax.set(xlim=(lo, hi), ylim=(lo, hi), xlabel="Measured SOH (%)", ylabel="Estimated SOH (%)",
                title=f"{split}: RMSE {rmse:.2f} % SOH")
     fig.suptitle(f"{model_name}: estimated vs measured SOH (held-out cells)")
@@ -128,14 +128,15 @@ def health_monitor(c, cell_id, fname="10_health_monitor_demo.png"):
     """What a BMS dashboard would show: estimated SOH with status bands."""
     fig, ax = plt.subplots(figsize=(7.5, 3.4))
     ax.axhspan(90, 105, color="#e8f3e8", lw=0)
-    ax.axhspan(80, 90, color="#fdf3dc", lw=0)
-    ax.axhspan(60, 80, color="#fbe4e3", lw=0)
+    alarm = config.EOL_ALARM_SOH                  # same REPLACE level as soh.predict
+    ax.axhspan(alarm, 90, color="#fdf3dc", lw=0)
+    ax.axhspan(60, alarm, color="#fbe4e3", lw=0)
     ax.plot(c["cycle"], c["soh"], color=INK, lw=1.4, label="measured (lab reference)")
     ax.plot(c["cycle"], c["pred"], color=C[0], lw=1, label="ML estimate (BMS-feasible model)")
     x0, x = c["cycle"].min(), c["cycle"].max()
     ax.text(x0, 101.5, "HEALTHY (>= 90 %)", color="#2f6b2f", fontsize=8)
-    ax.text(x0, 88.3, "MONITOR (80-90 %)", color="#8a5a00", fontsize=8)
-    ax.text(x, 75.5, "REPLACE / 2nd life (< 80 %)", color="#9b2c2c", fontsize=8, ha="right")
+    ax.text(x0, 88.3, f"MONITOR ({alarm:g}-90 %)", color="#8a5a00", fontsize=8)
+    ax.text(x, 75.5, f"REPLACE / 2nd life (< {alarm:g} %)", color="#9b2c2c", fontsize=8, ha="right")
     ax.set(ylim=(74, 103), xlabel="Cycle", ylabel="SOH (%)",
            title=f"Battery-health monitoring demo, unseen cell {cell_id}")
     ax.legend(loc="lower center")

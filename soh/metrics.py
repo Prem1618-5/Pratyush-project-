@@ -5,12 +5,18 @@ import pandas as pd
 from soh import config
 
 
+def rmse(y, p):
+    """The one RMSE used everywhere (report, figures, permutation importance, CLI)."""
+    y, p = np.asarray(y, float), np.asarray(p, float)
+    return float(np.sqrt(np.mean((p - y) ** 2)))
+
+
 def regression_metrics(y, p):
     y, p = np.asarray(y, float), np.asarray(p, float)
     e = p - y
     ss_tot = np.sum((y - y.mean()) ** 2)
     return {
-        "RMSE": float(np.sqrt(np.mean(e ** 2))),
+        "RMSE": rmse(y, p),
         "MAE": float(np.mean(np.abs(e))),
         "MAPE": float(np.mean(np.abs(e) / y) * 100),
         "R2": float(1 - np.sum(e ** 2) / ss_tot) if ss_tot > 0 else np.nan,
@@ -24,7 +30,7 @@ def band_rmse(y, p, bands=((80, 85), (85, 90), (90, 95), (95, 200))):
     for lo, hi in bands:
         m = (y >= lo) & (y < hi)
         name = f"RMSE_{lo}-{hi if hi < 200 else 'up'}"
-        out[name] = float(np.sqrt(np.mean((p[m] - y[m]) ** 2))) if m.sum() else np.nan
+        out[name] = rmse(y[m], p[m]) if m.sum() else np.nan
     return out
 
 

@@ -27,7 +27,7 @@ One command runs everything: `bash scripts/run_all.sh` (download → parse → e
 | `python -m soh.experiments [--quick] [--skip-deep]` (18 min measured, 4 cores) | `reports/results/*.json/csv`, `reports/figures/*.png`, `models/*.joblib` |
 | `python -m soh.report` | `reports/RESULTS.md` |
 | `python -m soh.predict --demo` | per-cycle SOH estimates + status, `soh_estimates.csv` |
-| `pytest -q` | 9 unit tests on synthetic data (no download needed) |
+| `pytest -q` | 15 unit tests on synthetic data (no download needed) |
 
 ---
 
@@ -54,7 +54,7 @@ One command runs everything: `bash scripts/run_all.sh` (download → parse → e
 ## `soh/data/` — raw files to per-cycle tables
 
 ### `download.py`
-- `_fetch(url, dest, expected_size)` — streams with HTTP `Range` so an interrupted download resumes; raises if the final size is wrong.
+- `_fetch(url, dest, expected_size)` — streams with HTTP `Range` so an interrupted download resumes; deletes and restarts a file that is larger than expected or that the server refuses to resume (HTTP 416); raises if the final size is wrong.
 - `download_mit()`, `download_nasa()` — NASA's zip contains inner zips; only the `FY08Q4` one (B0005/6/7/18) is extracted.
 
 ### `mit_loader.py`
@@ -70,15 +70,18 @@ Reads MATLAB v7.3 (= HDF5) files with `h5py`. Every field is an object reference
 
 ### `nasa_loader.py`
 - `_charge_features(d)` — CC 1.5 A to 4.2 V then CV to 20 mA: `chg_t_cc`, `chg_t_cv`, `chg_cv_tau` (time for current to halve from 1.5 A), `chg_dT`.
-- `load_cell(cell)` — one row per **discharge** (where capacity is measured); features from the preceding charge and the latest valid EIS fit (`IR = Re + Rct`, failed fits outside 0–1 Ω dropped).
-- `build_nasa_table()` — forward/back-fills impedance per cell; labels `soh` (vs 2.0 Ah) and `soh_init` (vs the cell's first capacity).
+- `load_cell(cell)` — one row per **discharge** (where capacity is measured); features from the charge since the previous discharge (NaN if there was none — one row each in B0005/6/7) and the latest valid EIS fit (`IR = Re + Rct`, failed fits outside 0–1 Ω dropped).
+- `build_nasa_table()` — forward-fills impedance per cell, **no back-fill** (the first 19 discharges of B0005/6/7 precede the first valid EIS test and stay NaN, instead of borrowing a future value); labels `soh` (vs 2.0 Ah) and `soh_init` (`preprocess.soh_init`).
 
 ---
 
 ## `soh/preprocess.py` — cleaning and labels
 
 - `_rolling_spike(s, window, k, floor)` — flags `|x − rolling median| > max(k·MAD, floor)`.
-- `clean_mit(df)` → `(df, log)`. Order and verified counts on the 100,501 raw rows:
+- `drop_invalid_rows(df)` → `(df, log)` — rules 1–2 below; works without a `QD` column.
+- `clean_measurements(df)` — rules 4–5 below (IR and temperature glitches → NaN).
+- `soh_init(df)` — QD ÷ median QD of the cell's first `BASELINE_CYCLES` (10) cycles × 100; one noisy first cycle cannot shift a whole cell's labels.
+- `clean_mit(df)` → `(df, log)` — calls all of the above, in this order. Verified counts on the 100,501 raw rows:
 
 | Step | Effect | Rows |
 |---|---|---|
@@ -88,7 +91,7 @@ Reads MATLAB v7.3 (= HDF5) files with `h5py`. Every field is an object reference
 | `flag_ir_bad` (IR ≤ 0 or spike) | IR set to NaN, forward-filled later | 29 |
 | `flag_temp_bad` (Tavg spike > 2 °C) | Tavg/Tmin/Tmax set to NaN | 85 |
 
-Adds `soh` (vs 1.1 Ah) and `soh_init` (vs the cell's first clean cycle). Result: 100,373 rows.
+Adds `soh` (vs 1.1 Ah) and `soh_init`. Result: 100,373 rows. `soh.predict` runs the same `drop_invalid_rows` + `clean_measurements`, so the deployed model sees inputs cleaned exactly like its training data.
 
 ---
 
@@ -125,7 +128,7 @@ Adds `soh` (vs 1.1 Ah) and `soh_init` (vs the cell's first clean cycle). Result:
 - `build_windows(df, feats, k)` — one window of k cycles per row, built per cell (left-padded with the cell's first row), so windows never cross cells or splits.
 - `RNN` (2-layer LSTM/GRU 64→32, dropout 0.2, last step → MLP), `CNN1D` (two conv + batch-norm blocks, global average pool). `make_net(name, n_feat)` picks one.
 - `Scaler` — median impute + min–max, fit on training windows, output clipped to [−1, 2].
-- `train_net(...)` — Adam, MSE on standardised labels, `ReduceLROnPlateau`, early stopping (patience 6) on validation **training** cells; returns the best state.
+- `train_net(...)` — Adam, MSE on standardised labels, `ReduceLROnPlateau`, early stopping (patience 6) on validation **training** cells; returns the best state. Raises a clear `RuntimeError` if the validation loss is never finite (NaN inputs or divergence).
 - `predict_net`, `n_params`.
 
 ---
@@ -134,6 +137,7 @@ Adds `soh` (vs 1.1 Ah) and `soh_init` (vs the cell's first clean cycle). Result:
 
 | Function | Returns |
 |---|---|
+| `rmse(y, p)` | the single RMSE used everywhere (report, figures, permutation importance, CLI) |
 | `regression_metrics(y, p)` | RMSE, MAE, MAPE, R², MaxAE |
 | `band_rmse(y, p)` | RMSE inside true-SOH bands 80–85, 85–90, 90–95, ≥ 95 |
 | `first_crossing(cycles, values, thr)` | first cycle below `thr`, else NaN |
@@ -161,19 +165,19 @@ Static PNGs in `reports/figures/`, one categorical palette `C`, split colours `S
 | `run_tabular()` | Dummy, XGB on `A0`, Ridge / RF / XGB on `A4`; tuned, 3 seeds for RF/XGB | `tabular.json` |
 | `main()` (after `run_tabular`) | picks the showcase model = lowest **primary + secondary** RMSE (Random Forest A4), so a model that fails on the new batch (Ridge) is not showcased | `best_model.json`, `per_cell_*.csv`, figs 03–05 |
 | `run_deep()` | LSTM / GRU / 1D-CNN on `A3` windows (k = 10), plus LSTM k ∈ {5, 10, 20, 30} | `deep.json` |
-| `run_ablation()` | XGB over every feature set; random-row vs cell-wise demo; 10 random cell splits | `ablation.json`, figs 07, 07b |
+| `run_ablation()` | XGB over every feature set; random-row vs cell-wise demo; 10 random cell splits (spike rows leave training only — every test cell keeps all its rows) | `ablation.json`, figs 07, 07b |
 | `run_nasa()` | leave-one-battery-out on NASA; MIT → NASA zero-shot on `TRANSFER_COLS` | `nasa.json`, figs 08–09 |
 | `run_explain_and_deploy()` | saves `soh_xgb_main/bms.joblib`, permutation importance, SHAP, footprint, monitor demo | `explain_deploy.json`, `permutation_importance_*.csv`, `shap_mean_abs.csv`, figs 06, 10 |
 | `reproducibility()` | library versions, seeds, git commit | `reproducibility.json` |
 
-`NASA_FEATS` deliberately omits NASA `chg_t_cc`: CC charging from empty at 1.5 A ≈ capacity / 1.5 A.
+`_model(name, seed, xgb_params)` builds every untrained model (tuned parameters go to XGBoost only). `NASA_FEATS` deliberately omits NASA `chg_t_cc`: CC charging from empty at 1.5 A ≈ capacity / 1.5 A.
 
 ## `soh/report.py`
 `build()` turns `reports/results/` into `reports/RESULTS.md` (sections 1–9: data, audit, main results R1, ablation R2, leakage R3, NASA R4, explainability, footprint R5, reproducibility). Helpers: `ms()` formats mean ± std, `md_table()` builds a Markdown table.
 
 ## `soh/predict.py` — the BMS-style CLI
-- `estimate(cycles, kind="bms", smooth=5)` — `add_derived` → clip to training ranges → XGBoost → rolling-median smoothing (5 cycles) → `est_capacity_Ah`, `status`.
-- `health_status(soh)` — `HEALTHY` ≥ 90 %, `MONITOR` 80–90 %, `REPLACE / SECOND-LIFE` < 80 %.
+- `estimate(cycles, kind="bms", smooth=5)` — training cleaning rules (`drop_invalid_rows`, `clean_measurements`) → `add_derived` → clip to training ranges → XGBoost → rolling-median smoothing (5 cycles) → `est_capacity_Ah`, `status`.
+- `health_status(soh)` — `HEALTHY` ≥ 90 %, `MONITOR` 80.5–90 %, `REPLACE / SECOND-LIFE` < 80.5 % (`config.EOL_ALARM_SOH`, the same level as the EOL metrics; at < 80 % batch-3 cells would never reach REPLACE).
 - Needs `models/soh_xgb_{bms,main}.joblib` and `models/train_clip_ranges.joblib` (created by `soh.experiments`).
 
 ---
@@ -191,3 +195,9 @@ Static PNGs in `reports/figures/`, one categorical palette `C`, split colours `S
 | `test_metrics_and_eol` | RMSE/MAE arithmetic; optimistic model → late (positive) alarm |
 | `test_audit_flags_disguised_label_and_keeps_noise_feature` | audit excludes a disguised label, keeps noise |
 | `test_clip_uses_training_rows_only` | clipping limits come from training rows |
+| `test_inference_cleaning_matches_training` | `soh.predict` drops cycle 1 and blanks IR ≤ 0 like training |
+| `test_replace_status_uses_eol_alarm_level` | 80.1 % SOH → REPLACE (batch-3 end of life) |
+| `test_soh_init_ignores_one_noisy_first_cycle` | `soh_init` baseline is the median of the first 10 cycles |
+| `test_deep_training_fails_clearly_on_nan_loss` | NaN loss → clear `RuntimeError`, not a crash in `load_state_dict` |
+| `test_rmse_is_shared` | one RMSE definition |
+| `test_download_restarts_oversized_file` | a too-large partial download is deleted and restarted |
