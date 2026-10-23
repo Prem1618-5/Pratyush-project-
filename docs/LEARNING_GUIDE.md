@@ -71,7 +71,7 @@ The secondary set (batch 3) was cycled a year later → also tests batch shift.
 
 > ✅ **Verified** (RESULTS.md §5, same 84 cells, 50 % held out): random-row RMSE 0.15 (XGB) / 0.16 (RF)
 > vs cell-wise 0.56 / 0.65 → the wrong split looks **~4× better** than it is. Over 10 random 80/20 cell
-> splits of all 124 cells XGBoost scores 0.52 ± 0.10 (range 0.33–0.66): the official split is a
+> splits of all 124 cells XGBoost scores 0.52 ± 0.10 (range 0.36–0.67): the official split is a
 > harder-than-average draw, and the cell choice alone moves RMSE by 2×.
 
 **Exercise.** `reports/RESULTS.md` §5 shows the random-row split vs cell-wise split. Explain the gap

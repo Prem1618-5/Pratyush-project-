@@ -95,7 +95,7 @@ models/                  deployable XGBoost models (main = A4, bms = A2) + train
 6. **Safety caveat: models are optimistic near end of life.** On the later batch no model's raw estimate
    crosses the 80.5 % alarm level before the cell does (missed alarms; RESULTS §3). A BMS must not use
    these estimates alone for retirement decisions without a safety margin or periodic reference tests.
-7. **Cross-chemistry transfer fails, as expected.** NASA leave-one-battery-out gives 8–9 % RMSE. MIT → NASA
+7. **Cross-chemistry transfer fails, as expected.** NASA leave-one-battery-out gives 8–9 % RMSE with trees (Ridge 13.6 %). MIT → NASA
    zero-shot gives ~11–12 %, and the trees floor at ~85 % because MIT labels never go as low as NASA's (57 %).
 
 ## Use in a battery management system

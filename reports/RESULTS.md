@@ -46,7 +46,7 @@ Each feature alone, on training cells only. `r2_single_cv` = cross-cell R² of a
 | dq_min_log | F6 partial dQ(V) | -0.87 | -0.99 | 0.848 | caution | log10 |min| of the same curve difference |
 | dq_mean | F6 partial dQ(V) | 0.84 | 0.97 | 0.823 | caution | Mean of the curve difference in the partial window |
 | chargetime | F7 protocol | -0.52 | -0.83 | 0.071 | ablation | Total charge time: mostly encodes which of 72 policies was used |
-| cycle | F9 age | -0.74 | -1.00 | 0.288 | ablation | Cycle count: shortcut, lifetimes span 150-2,300 cycles |
+| cycle | F9 age | -0.74 | -1.00 | 0.288 | ablation | Cycle count: shortcut, lifetimes span 170-2,240 cycles |
 | QD | X1 label | 1.00 | 1.00 | 1.000 | EXCLUDED (physics/definition) | IS the label |
 | QC | X2 charge capacity | 1.00 | 1.00 | 0.999 | EXCLUDED (physics/definition) | Coulombic efficiency ~1 so QC ~ QD |
 | dis_time | X3 discharge time | 0.95 | 1.00 | 0.943 | EXCLUDED (physics/definition) | Q = I*t with I fixed at 4.4 A |
@@ -125,19 +125,19 @@ Same 84 cells (train + primary), same model, 50 % held out either as random **ro
 
 ![leakage](figures/07b_leakage.png)
 
-**Robustness:** XGBoost (A4) over 10 random 80/20 *cell* splits of all 124 cells: RMSE 0.515 ± 0.104 % SOH (range 0.33–0.66).
+**Robustness:** XGBoost (A4) over 10 random 80/20 *cell* splits of all 124 cells: RMSE 0.520 ± 0.101 % SOH (range 0.36–0.67).
 
 ## 6. NASA — template R4 (O5)
 
 | Model | Setting | B0005 | B0006 | B0007 | B0018 | Mean ± std |
 |---|---|---|---|---|---|---|
-| ridge | NASA LOBO (label soh) | 4.31 | 9.94 | 5.89 | 13.41 | 8.39 ± 3.55 |
-| rf | NASA LOBO (label soh) | 6.09 | 9.73 | 3.43 | 18.53 | 9.44 ± 5.70 |
-| xgb | NASA LOBO (label soh) | 5.62 | 9.46 | 2.44 | 16.92 | 8.61 ± 5.40 |
-| rf | MIT → NASA zero-shot (soh_init); MIT sanity 1.91 | 9.13 | 17.32 | 6.54 | 15.52 | 12.13 ± 4.43 |
-| xgb | MIT → NASA zero-shot (soh_init); MIT sanity 1.90 | 8.10 | 16.05 | 5.67 | 16.01 | 11.46 ± 4.65 |
+| ridge | NASA LOBO (label soh) | 6.17 | 11.65 | 8.56 | 28.18 | 13.64 ± 8.62 |
+| rf | NASA LOBO (label soh) | 6.20 | 8.78 | 4.10 | 14.27 | 8.34 ± 3.80 |
+| xgb | NASA LOBO (label soh) | 6.12 | 9.11 | 3.16 | 16.72 | 8.78 ± 5.05 |
+| rf | MIT → NASA zero-shot (soh_init); MIT sanity 1.90 | 8.26 | 16.43 | 6.31 | 14.38 | 11.35 ± 4.18 |
+| xgb | MIT → NASA zero-shot (soh_init); MIT sanity 1.89 | 8.45 | 15.50 | 6.95 | 14.84 | 11.43 ± 3.78 |
 
-NASA labels go down to 57.7 % SOH (56.7 % soh_init); MIT training labels only reach 76.4 % soh_init, and trees cannot extrapolate below their lowest training label.
+NASA labels go down to 57.7 % SOH (57.3 % soh_init); MIT training labels only reach 76.2 % soh_init, and trees cannot extrapolate below their lowest training label.
 
 ![nasa lobo](figures/08_nasa_lobo.png)
 
@@ -170,13 +170,13 @@ Top mean |SHAP| (main model): `chg_ic_peak_rm5` 2.33, `chg_ic_peak` 0.64, `d_chg
 
 | Model | Parameters / trees | File size (KB) | CPU inference per cycle (ms) | Needs full discharge? |
 |---|---|---|---|---|
-| XGBoost A4_plus_history | 1000 trees x depth<=6 | 3548 | 2.76 | yes (dQ(V) features) |
-| XGBoost A2_bms_charge | 1000 trees x depth<=6 | 3507 | 2.10 | no (charge segment, IR, temperature) |
-| Random Forest A4 | 300 trees, mean depth 32 | 749089 | 87.31 | yes (dQ(V) features) |
-| Ridge A4 | 34 coefficients | 3 | 1.56 | yes (dQ(V) features) |
-| LSTM (k=10) | 35361 | 142 | 0.55 | yes (dQ(V) features) |
-| GRU (k=10) | 26657 | 108 | 0.51 | yes (dQ(V) features) |
-| 1D-CNN (k=10) | 10561 | 48 | 0.19 | yes (dQ(V) features) |
+| XGBoost A4_plus_history | 1000 trees x depth<=6 | 3548 | 2.25 | yes (dQ(V) features) |
+| XGBoost A2_bms_charge | 1000 trees x depth<=6 | 3507 | 1.68 | no (charge segment, IR, temperature) |
+| Random Forest A4 | 300 trees, mean depth 32 | 749089 | 73.39 | yes (dQ(V) features) |
+| Ridge A4 | 34 coefficients | 3 | 1.17 | yes (dQ(V) features) |
+| LSTM (k=10) | 35361 | 142 | 0.38 | yes (dQ(V) features) |
+| GRU (k=10) | 26657 | 108 | 0.42 | yes (dQ(V) features) |
+| 1D-CNN (k=10) | 10561 | 48 | 0.20 | yes (dQ(V) features) |
 
 Timing is single-cycle Python inference on one CPU core of the build machine (includes Python call overhead), not a microcontroller.
 
@@ -193,5 +193,5 @@ Timing is single-cycle Python inference on one CPU core of the build machine (in
 | xgboost | 3.4.1 |
 | torch | 2.14.1+cpu |
 | seeds | [0, 1, 2] |
-| commit | fda23cc |
-| date | 2026-10-22 19:18 |
+| commit | c9ddb15 |
+| date | 2026-10-23 05:19 |

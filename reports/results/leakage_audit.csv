@@ -21,7 +21,7 @@ dq_var_log,F6 partial dQ(V),caution,-0.8592203053392352,-0.9845951168349849,0.83
 dq_min_log,F6 partial dQ(V),caution,-0.8695706208448406,-0.9889872257167099,0.8481272860733191,1.0,caution,log10 |min| of the same curve difference
 dq_mean,F6 partial dQ(V),caution,0.8405135263596573,0.972882896139666,0.8232847349255057,1.0,caution,Mean of the curve difference in the partial window
 chargetime,F7 protocol,ablation,-0.5238416347460912,-0.8279301244574212,0.07109000619354378,1.0,ablation,Total charge time: mostly encodes which of 72 policies was used
-cycle,F9 age,ablation,-0.7374165544683902,-0.9980876691588207,0.28825404846908287,1.0,ablation,"Cycle count: shortcut, lifetimes span 150-2,300 cycles"
+cycle,F9 age,ablation,-0.7374165544683902,-0.9980876691588207,0.28825404846908287,1.0,ablation,"Cycle count: shortcut, lifetimes span 170-2,240 cycles"
 QD,X1 label,excluded,1.0,1.0,0.9998819309956363,1.0,EXCLUDED (physics/definition),IS the label
 QC,X2 charge capacity,excluded,0.9996100092200781,0.999764397415227,0.9986414134492111,1.0,EXCLUDED (physics/definition),Coulombic efficiency ~1 so QC ~ QD
 dis_time,X3 discharge time,excluded,0.9542627382198712,0.9975793805807355,0.9432181026044572,1.0,EXCLUDED (physics/definition),Q = I*t with I fixed at 4.4 A
