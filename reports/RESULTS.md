@@ -71,6 +71,8 @@ Each feature alone, on training cells only. `r2_single_cv` = cross-cell R² of a
 
 EOL error uses an alarm at 80.5 % SOH (batch-3 cells stop at 80.0–80.15 %, so a strict 80 % crossing never occurs there). It is computed on raw, unsmoothed per-cycle estimates, so a single noisy low estimate triggers an early alarm. A **missed alarm** = the cell truly crossed the alarm level but the estimate never did (the model is optimistic near end of life) — the dangerous failure mode for a BMS.
 
+Figures below use the model with the lowest mean of primary and secondary RMSE: **Random Forest | A4_plus_history**.
+
 ![pred vs true](figures/03_pred_vs_true.png)
 
 ![trajectories primary](figures/04_trajectories_test_primary.png)
@@ -168,13 +170,13 @@ Top mean |SHAP| (main model): `chg_ic_peak_rm5` 2.33, `chg_ic_peak` 0.64, `d_chg
 
 | Model | Parameters / trees | File size (KB) | CPU inference per cycle (ms) | Needs full discharge? |
 |---|---|---|---|---|
-| XGBoost A4_plus_history | 1000 trees x depth<=6 | 3548 | 2.69 | yes (dQ(V) features) |
-| XGBoost A2_bms_charge | 1000 trees x depth<=6 | 3507 | 1.93 | no (charge segment, IR, temperature) |
-| Random Forest A4 | 300 trees, mean depth 32 | 749089 | 81.07 | yes (dQ(V) features) |
-| Ridge A4 | 34 coefficients | 3 | 1.38 | yes (dQ(V) features) |
-| LSTM (k=10) | 35361 | 142 | 0.45 | yes (dQ(V) features) |
-| GRU (k=10) | 26657 | 108 | 0.47 | yes (dQ(V) features) |
-| 1D-CNN (k=10) | 10561 | 48 | 0.27 | yes (dQ(V) features) |
+| XGBoost A4_plus_history | 1000 trees x depth<=6 | 3548 | 2.76 | yes (dQ(V) features) |
+| XGBoost A2_bms_charge | 1000 trees x depth<=6 | 3507 | 2.10 | no (charge segment, IR, temperature) |
+| Random Forest A4 | 300 trees, mean depth 32 | 749089 | 87.31 | yes (dQ(V) features) |
+| Ridge A4 | 34 coefficients | 3 | 1.56 | yes (dQ(V) features) |
+| LSTM (k=10) | 35361 | 142 | 0.55 | yes (dQ(V) features) |
+| GRU (k=10) | 26657 | 108 | 0.51 | yes (dQ(V) features) |
+| 1D-CNN (k=10) | 10561 | 48 | 0.19 | yes (dQ(V) features) |
 
 Timing is single-cycle Python inference on one CPU core of the build machine (includes Python call overhead), not a microcontroller.
 
@@ -191,5 +193,5 @@ Timing is single-cycle Python inference on one CPU core of the build machine (in
 | xgboost | 3.4.1 |
 | torch | 2.14.1+cpu |
 | seeds | [0, 1, 2] |
-| commit | 6fa4d1c |
-| date | 2026-10-22 19:10 |
+| commit | fda23cc |
+| date | 2026-10-22 19:18 |

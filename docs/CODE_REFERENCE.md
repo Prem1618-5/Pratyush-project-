@@ -158,7 +158,8 @@ Static PNGs in `reports/figures/`, one categorical palette `C`, split colours `S
 | Function | Stage | Writes |
 |---|---|---|
 | `prepare()` | clean → derive → split → audit (training cells, spikes removed) → clip | `data_summary.json`, `leakage_audit.csv`, `models/train_clip_ranges.joblib`, figs 01–02 |
-| `run_tabular()` | Dummy, XGB on `A0`, Ridge / RF / XGB on `A4`; tuned, 3 seeds for RF/XGB | `tabular.json`, `per_cell_*.csv`, figs 03–05 |
+| `run_tabular()` | Dummy, XGB on `A0`, Ridge / RF / XGB on `A4`; tuned, 3 seeds for RF/XGB | `tabular.json` |
+| `main()` (after `run_tabular`) | picks the showcase model = lowest **primary + secondary** RMSE (Random Forest A4), so a model that fails on the new batch (Ridge) is not showcased | `best_model.json`, `per_cell_*.csv`, figs 03–05 |
 | `run_deep()` | LSTM / GRU / 1D-CNN on `A3` windows (k = 10), plus LSTM k ∈ {5, 10, 20, 30} | `deep.json` |
 | `run_ablation()` | XGB over every feature set; random-row vs cell-wise demo; 10 random cell splits | `ablation.json`, figs 07, 07b |
 | `run_nasa()` | leave-one-battery-out on NASA; MIT → NASA zero-shot on `TRANSFER_COLS` | `nasa.json`, figs 08–09 |

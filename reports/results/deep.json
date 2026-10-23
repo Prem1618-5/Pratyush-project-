@@ -945,19 +945,19 @@
     "LSTM (k=10)": {
       "params": 35361,
       "size_kb": 142.1240234375,
-      "ms_per_cycle": 0.4532754750005097,
+      "ms_per_cycle": 0.5530132350008898,
       "needs_full_discharge": "yes (dQ(V) features)"
     },
     "GRU (k=10)": {
       "params": 26657,
       "size_kb": 108.1240234375,
-      "ms_per_cycle": 0.4702706500000886,
+      "ms_per_cycle": 0.5084298550013955,
       "needs_full_discharge": "yes (dQ(V) features)"
     },
     "1D-CNN (k=10)": {
       "params": 10561,
       "size_kb": 47.7314453125,
-      "ms_per_cycle": 0.2733583499997394,
+      "ms_per_cycle": 0.19223088499984442,
       "needs_full_discharge": "yes (dQ(V) features)"
     }
   },

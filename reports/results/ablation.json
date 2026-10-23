@@ -221,9 +221,9 @@
   },
   "leakage": {
     "rf": {
-      "random_row_rmse": 0.16232283710039727,
-      "random_row_std": 0.0028976529301202153,
-      "cell_wise_rmse": 0.6509154742890891,
+      "random_row_rmse": 0.1623228371003973,
+      "random_row_std": 0.0028976529301201815,
+      "cell_wise_rmse": 0.6509154742890892,
       "cell_wise_std": 0.38231016957930186,
       "inflation": 4.010005529206562
     },
