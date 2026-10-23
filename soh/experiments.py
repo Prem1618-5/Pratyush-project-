@@ -1,6 +1,6 @@
 """Run every experiment in the project plan and save results to reports/results/.
 
-    python -m soh.experiments              # everything (~30-45 min on 4 CPU cores)
+    python -m soh.experiments              # everything (~20 min on 4 CPU cores; measured 18 min)
     python -m soh.experiments --quick      # 1 seed, short deep training (smoke test)
 
 Then build the written report with:  python -m soh.report
